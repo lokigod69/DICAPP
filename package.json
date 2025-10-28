@@ -1,0 +1,20 @@
+{
+  "name": "runedeck",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RuneDeck - Advanced vocabulary trainer with spaced repetition",
+  "scripts": {
+    "dev:desktop": "pnpm -C apps/desktop dev",
+    "dev:web": "pnpm -C apps/web dev",
+    "build:desktop": "pnpm -C apps/desktop tauri build",
+    "build:web": "pnpm -C apps/web build",
+    "test": "vitest",
+    "lint": "eslint .",
+    "type-check": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}

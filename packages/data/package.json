@@ -1,0 +1,17 @@
+{
+  "name": "@runedeck/data",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./sqlite": "./src/SqliteStore.ts",
+    "./wasm": "./src/WasmSqliteStore.ts"
+  },
+  "dependencies": {
+    "@runedeck/core": "workspace:*",
+    "sql.js": "^1.10.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

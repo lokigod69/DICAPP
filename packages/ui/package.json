@@ -1,0 +1,21 @@
+{
+  "name": "@runedeck/ui",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./components": "./src/components/index.ts",
+    "./screens": "./src/screens/index.ts",
+    "./themes": "./src/themes/index.ts"
+  },
+  "dependencies": {
+    "@runedeck/core": "workspace:*",
+    "@runedeck/data": "workspace:*",
+    "lucide-svelte": "^0.305.0",
+    "svelte": "^4.2.8"
+  },
+  "devDependencies": {
+    "@sveltejs/kit": "^2.0.0",
+    "typescript": "^5.3.3"
+  }
+}

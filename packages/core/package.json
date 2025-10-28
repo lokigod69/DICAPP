@@ -1,0 +1,22 @@
+{
+  "name": "@runedeck/core",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./models": "./src/models/index.ts",
+    "./scheduler": "./src/scheduler/index.ts",
+    "./queue": "./src/queue/index.ts",
+    "./csv": "./src/csv/index.ts"
+  },
+  "dependencies": {
+    "date-fns": "^3.0.0",
+    "papaparse": "^5.4.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/papaparse": "^5.3.14",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  }
+}
