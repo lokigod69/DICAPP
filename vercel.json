@@ -1,5 +1,0 @@
-{
-  "framework": "sveltekit",
-  "buildCommand": "cd apps/desktop && pnpm install && pnpm build",
-  "outputDirectory": "apps/desktop/build"
-}
