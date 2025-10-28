@@ -14,7 +14,8 @@ export default defineConfig({
   clearScreen: false,
   server: {
     port: 5173,
-    strictPort: true,
+    strictPort: false,   // falls back to next free port automatically
+    host: true
   },
   envPrefix: ['VITE_', 'TAURI_'],
   build: {

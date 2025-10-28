@@ -1,5 +1,5 @@
 {
   "framework": "sveltekit",
-  "buildCommand": "pnpm --filter ./apps/desktop build",
+  "buildCommand": "cd apps/desktop && pnpm install && pnpm build",
   "outputDirectory": "apps/desktop/build"
 }

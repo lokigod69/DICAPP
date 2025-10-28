@@ -17,7 +17,7 @@ export class WasmSqliteStore implements IDataStore {
   async init(): Promise<void> {
     // Initialize sql.js
     this.SQL = await initSqlJs({
-      locateFile: (file) => `/sql-wasm.wasm`,
+      locateFile: (file) => `/${file}`,
     });
 
     // Try to load existing database from IndexedDB

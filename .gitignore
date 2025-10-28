@@ -42,3 +42,10 @@ coverage
 *.db
 *.db-shm
 *.db-wal
+node_modules
+apps/desktop/.svelte-kit
+apps/desktop/build
+apps/web/.svelte-kit
+dist
+pnpm-lock.yaml
+.DS_Store

@@ -7,7 +7,6 @@
   export let word: Word;
   export let scheduling: SchedulingData;
   export let revealed = false;
-  export let mode: 'learning' | 'retention' | 'clinic' = 'learning';
 
   $: rarity = frequencyToRarity(word.freq);
   $: actualMode = modeOf(scheduling);
