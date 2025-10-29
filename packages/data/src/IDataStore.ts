@@ -1,4 +1,4 @@
-import type { Word, SchedulingData, Review, WordWithScheduling } from '@runedeck/core/models';
+import type { Word, SchedulingData, Review, WordWithScheduling, Deck } from '@runedeck/core/models';
 
 /**
  * Storage interface - implemented by both SQLite (desktop) and sql.js (web)
@@ -9,15 +9,32 @@ export interface IDataStore {
    */
   init(): Promise<void>;
 
+  // === Decks ===
+
+  createDeck(deck: Deck): Promise<void>;
+  getDeck(id: string): Promise<Deck | null>;
+  getDeckBySlug(slug: string): Promise<Deck | null>;
+  updateDeck(deck: Deck): Promise<void>;
+  deleteDeck(id: string): Promise<void>;
+  getAllDecks(): Promise<Deck[]>;
+  getDeckStats(deckId: string): Promise<{
+    total: number;
+    new: number;
+    due: number;
+    learning: number;
+    retention: number;
+    leeches: number;
+  }>;
+
   // === Words ===
 
   createWord(word: Word): Promise<void>;
   getWord(id: string): Promise<Word | null>;
   updateWord(word: Word): Promise<void>;
   deleteWord(id: string): Promise<void>;
-  getAllWords(): Promise<Word[]>;
-  searchWords(query: string): Promise<Word[]>;
-  getWordsByTags(tags: string[]): Promise<Word[]>;
+  getAllWords(deckId?: string): Promise<Word[]>;
+  searchWords(query: string, deckId?: string): Promise<Word[]>;
+  getWordsByTags(tags: string[], deckId?: string): Promise<Word[]>;
 
   // === Scheduling ===
 
@@ -27,17 +44,17 @@ export interface IDataStore {
   /**
    * Get due cards (due_ts <= now) with scheduling data
    */
-  getDue(limit: number, now?: number): Promise<WordWithScheduling[]>;
+  getDue(deckId: string, limit: number, now?: number): Promise<WordWithScheduling[]>;
 
   /**
    * Get new cards (is_new = 1)
    */
-  getNew(limit: number): Promise<WordWithScheduling[]>;
+  getNew(deckId: string, limit: number): Promise<WordWithScheduling[]>;
 
   /**
    * Get leeches (lapses >= threshold)
    */
-  getLeeches(threshold: number): Promise<WordWithScheduling[]>;
+  getLeeches(deckId: string, threshold: number): Promise<WordWithScheduling[]>;
 
   // === Reviews ===
 

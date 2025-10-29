@@ -1,5 +1,5 @@
 import initSqlJs, { type Database } from 'sql.js';
-import type { Word, SchedulingData, Review, WordWithScheduling } from '@runedeck/core/models';
+import type { Word, SchedulingData, Review, WordWithScheduling, Deck } from '@runedeck/core/models';
 import { createInitialScheduling } from '@runedeck/core/models';
 import type { IDataStore } from './IDataStore';
 import { MIGRATIONS, serializeTags, deserializeTags } from './schema';
@@ -131,12 +131,94 @@ export class WasmSqliteStore implements IDataStore {
     this.db.run(sql, params);
   }
 
+  // === Decks ===
+
+  async createDeck(deck: Deck): Promise<void> {
+    this.run(
+      `INSERT INTO decks (id, name, slug, profile, created_at, config_json)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [deck.id, deck.name, deck.slug, deck.profile, deck.created_at, JSON.stringify(deck.config)]
+    );
+    await this.persist();
+  }
+
+  async getDeck(id: string): Promise<Deck | null> {
+    const rows = this.exec('SELECT * FROM decks WHERE id = ?', [id]);
+    if (rows.length === 0) return null;
+    return this.mapRowToDeck(rows[0]);
+  }
+
+  async getDeckBySlug(slug: string): Promise<Deck | null> {
+    const rows = this.exec('SELECT * FROM decks WHERE slug = ?', [slug]);
+    if (rows.length === 0) return null;
+    return this.mapRowToDeck(rows[0]);
+  }
+
+  async updateDeck(deck: Deck): Promise<void> {
+    this.run(
+      `UPDATE decks SET name = ?, slug = ?, profile = ?, config_json = ? WHERE id = ?`,
+      [deck.name, deck.slug, deck.profile, JSON.stringify(deck.config), deck.id]
+    );
+    await this.persist();
+  }
+
+  async deleteDeck(id: string): Promise<void> {
+    this.run('DELETE FROM decks WHERE id = ?', [id]);
+    await this.persist();
+  }
+
+  async getAllDecks(): Promise<Deck[]> {
+    const rows = this.exec('SELECT * FROM decks ORDER BY created_at');
+    return rows.map((row) => this.mapRowToDeck(row));
+  }
+
+  async getDeckStats(deckId: string): Promise<{
+    total: number;
+    new: number;
+    due: number;
+    learning: number;
+    retention: number;
+    leeches: number;
+  }> {
+    const now = Date.now();
+    const [totalRow] = this.exec('SELECT COUNT(*) as count FROM words WHERE deck_id = ?', [deckId]);
+    const [newRow] = this.exec(
+      'SELECT COUNT(*) as count FROM words w JOIN scheduling s ON w.id = s.word_id WHERE w.deck_id = ? AND s.is_new = 1',
+      [deckId]
+    );
+    const [dueRow] = this.exec(
+      'SELECT COUNT(*) as count FROM words w JOIN scheduling s ON w.id = s.word_id WHERE w.deck_id = ? AND s.due_ts <= ? AND s.is_new = 0',
+      [deckId, now]
+    );
+    const [learningRow] = this.exec(
+      'SELECT COUNT(*) as count FROM words w JOIN scheduling s ON w.id = s.word_id WHERE w.deck_id = ? AND s.is_new = 0 AND s.interval < 7',
+      [deckId]
+    );
+    const [retentionRow] = this.exec(
+      'SELECT COUNT(*) as count FROM words w JOIN scheduling s ON w.id = s.word_id WHERE w.deck_id = ? AND s.is_new = 0 AND s.interval >= 7 AND s.lapses < 8',
+      [deckId]
+    );
+    const [leechesRow] = this.exec(
+      'SELECT COUNT(*) as count FROM words w JOIN scheduling s ON w.id = s.word_id WHERE w.deck_id = ? AND s.lapses >= 8',
+      [deckId]
+    );
+
+    return {
+      total: totalRow?.count || 0,
+      new: newRow?.count || 0,
+      due: dueRow?.count || 0,
+      learning: learningRow?.count || 0,
+      retention: retentionRow?.count || 0,
+      leeches: leechesRow?.count || 0,
+    };
+  }
+
   // === Words ===
 
   async createWord(word: Word): Promise<void> {
     this.run(
-      `INSERT INTO words (id, headword, pos, ipa, definition, example, gloss_de, etymology, mnemonic, tags, freq, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO words (id, headword, pos, ipa, definition, example, gloss_de, etymology, mnemonic, tags, freq, created_at, updated_at, deck_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         word.id,
         word.headword,
@@ -151,6 +233,7 @@ export class WasmSqliteStore implements IDataStore {
         word.freq,
         word.created_at,
         word.updated_at,
+        word.deck_id,
       ]
     );
     await this.persist();
@@ -165,7 +248,7 @@ export class WasmSqliteStore implements IDataStore {
   async updateWord(word: Word): Promise<void> {
     this.run(
       `UPDATE words SET headword = ?, pos = ?, ipa = ?, definition = ?, example = ?,
-       gloss_de = ?, etymology = ?, mnemonic = ?, tags = ?, freq = ?, updated_at = ?
+       gloss_de = ?, etymology = ?, mnemonic = ?, tags = ?, freq = ?, updated_at = ?, deck_id = ?
        WHERE id = ?`,
       [
         word.headword,
@@ -179,6 +262,7 @@ export class WasmSqliteStore implements IDataStore {
         serializeTags(word.tags),
         word.freq,
         word.updated_at,
+        word.deck_id,
         word.id,
       ]
     );
@@ -190,13 +274,24 @@ export class WasmSqliteStore implements IDataStore {
     await this.persist();
   }
 
-  async getAllWords(): Promise<Word[]> {
+  async getAllWords(deckId?: string): Promise<Word[]> {
+    if (deckId) {
+      const rows = this.exec('SELECT * FROM words WHERE deck_id = ? ORDER BY headword', [deckId]);
+      return rows.map((row) => this.mapRowToWord(row));
+    }
     const rows = this.exec('SELECT * FROM words ORDER BY headword');
     return rows.map((row) => this.mapRowToWord(row));
   }
 
-  async searchWords(query: string): Promise<Word[]> {
+  async searchWords(query: string, deckId?: string): Promise<Word[]> {
     const pattern = `%${query}%`;
+    if (deckId) {
+      const rows = this.exec(
+        'SELECT * FROM words WHERE deck_id = ? AND (headword LIKE ? OR definition LIKE ?) ORDER BY headword',
+        [deckId, pattern, pattern]
+      );
+      return rows.map((row) => this.mapRowToWord(row));
+    }
     const rows = this.exec(
       'SELECT * FROM words WHERE headword LIKE ? OR definition LIKE ? ORDER BY headword',
       [pattern, pattern]
@@ -204,9 +299,18 @@ export class WasmSqliteStore implements IDataStore {
     return rows.map((row) => this.mapRowToWord(row));
   }
 
-  async getWordsByTags(tags: string[]): Promise<Word[]> {
+  async getWordsByTags(tags: string[], deckId?: string): Promise<Word[]> {
     const conditions = tags.map(() => 'tags LIKE ?').join(' OR ');
     const patterns = tags.map((tag) => `%"${tag}"%`);
+
+    if (deckId) {
+      const rows = this.exec(
+        `SELECT * FROM words WHERE deck_id = ? AND (${conditions}) ORDER BY headword`,
+        [deckId, ...patterns]
+      );
+      return rows.map((row) => this.mapRowToWord(row));
+    }
+
     const rows = this.exec(`SELECT * FROM words WHERE ${conditions} ORDER BY headword`, patterns);
     return rows.map((row) => this.mapRowToWord(row));
   }
@@ -234,42 +338,42 @@ export class WasmSqliteStore implements IDataStore {
     await this.persist();
   }
 
-  async getDue(limit: number, now = Date.now()): Promise<WordWithScheduling[]> {
+  async getDue(deckId: string, limit: number, now = Date.now()): Promise<WordWithScheduling[]> {
     const rows = this.exec(
       `SELECT w.*, s.word_id as sched_word_id, s.due_ts, s.interval, s.ease, s.lapses, s.is_new
        FROM words w
        INNER JOIN scheduling s ON w.id = s.word_id
-       WHERE s.due_ts <= ? AND s.is_new = 0
+       WHERE w.deck_id = ? AND s.due_ts <= ? AND s.is_new = 0
        ORDER BY s.due_ts ASC
        LIMIT ?`,
-      [now, limit]
+      [deckId, now, limit]
     );
 
     return rows.map((row) => this.mapRowToWordWithScheduling(row));
   }
 
-  async getNew(limit: number): Promise<WordWithScheduling[]> {
+  async getNew(deckId: string, limit: number): Promise<WordWithScheduling[]> {
     const rows = this.exec(
       `SELECT w.*, s.word_id as sched_word_id, s.due_ts, s.interval, s.ease, s.lapses, s.is_new
        FROM words w
        INNER JOIN scheduling s ON w.id = s.word_id
-       WHERE s.is_new = 1
+       WHERE w.deck_id = ? AND s.is_new = 1
        ORDER BY w.created_at ASC
        LIMIT ?`,
-      [limit]
+      [deckId, limit]
     );
 
     return rows.map((row) => this.mapRowToWordWithScheduling(row));
   }
 
-  async getLeeches(threshold: number): Promise<WordWithScheduling[]> {
+  async getLeeches(deckId: string, threshold: number): Promise<WordWithScheduling[]> {
     const rows = this.exec(
       `SELECT w.*, s.word_id as sched_word_id, s.due_ts, s.interval, s.ease, s.lapses, s.is_new
        FROM words w
        INNER JOIN scheduling s ON w.id = s.word_id
-       WHERE s.lapses >= ?
+       WHERE w.deck_id = ? AND s.lapses >= ?
        ORDER BY s.lapses DESC`,
-      [threshold]
+      [deckId, threshold]
     );
 
     return rows.map((row) => this.mapRowToWordWithScheduling(row));
@@ -358,6 +462,17 @@ export class WasmSqliteStore implements IDataStore {
 
   // === Mappers ===
 
+  private mapRowToDeck(row: any): Deck {
+    return {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      profile: row.profile as 'simple' | 'full',
+      created_at: row.created_at,
+      config: JSON.parse(row.config_json),
+    };
+  }
+
   private mapRowToWord(row: any): Word {
     return {
       id: row.id,
@@ -373,6 +488,7 @@ export class WasmSqliteStore implements IDataStore {
       freq: row.freq,
       created_at: row.created_at,
       updated_at: row.updated_at,
+      deck_id: row.deck_id,
     };
   }
 

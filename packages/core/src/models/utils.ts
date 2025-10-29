@@ -1,4 +1,5 @@
-import type { Word, SchedulingData } from './types';
+import type { Word, SchedulingData, Deck, DeckConfig } from './types';
+import { DEFAULT_DECK_CONFIG } from './types';
 
 /**
  * Generate a simple UUID v4
@@ -12,9 +13,37 @@ export function uuid(): string {
 }
 
 /**
+ * Create slug from name
+ */
+export function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .trim();
+}
+
+/**
+ * Create a new Deck with defaults
+ */
+export function createDeck(
+  partial: Partial<Deck> & Pick<Deck, 'name' | 'profile'>
+): Deck {
+  const now = Date.now();
+  return {
+    id: uuid(),
+    slug: slugify(partial.name),
+    created_at: now,
+    config: DEFAULT_DECK_CONFIG,
+    ...partial,
+  };
+}
+
+/**
  * Create a new Word with defaults
  */
-export function createWord(partial: Partial<Word> & Pick<Word, 'headword' | 'definition'>): Word {
+export function createWord(partial: Partial<Word> & Pick<Word, 'headword' | 'definition' | 'deck_id'>): Word {
   const now = Date.now();
   return {
     id: uuid(),

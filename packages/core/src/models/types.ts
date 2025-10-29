@@ -1,5 +1,43 @@
 import { z } from 'zod';
 
+// Deck profiles
+export type DeckProfile = 'simple' | 'full';
+
+// Deck configuration
+export interface DeckConfig {
+  newPerDay: number;
+  dueLimit: number;
+  leechThreshold: number;
+  studyOrientation: 'word-to-def' | 'def-to-word';
+  learningReveal: 'minimal' | 'rich';
+}
+
+export const DEFAULT_DECK_CONFIG: DeckConfig = {
+  newPerDay: 10,
+  dueLimit: 20,
+  leechThreshold: 8,
+  studyOrientation: 'word-to-def',
+  learningReveal: 'minimal',
+};
+
+// Deck model
+export const DeckSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  slug: z.string().min(1),
+  profile: z.enum(['simple', 'full']),
+  created_at: z.number(),
+  config: z.object({
+    newPerDay: z.number(),
+    dueLimit: z.number(),
+    leechThreshold: z.number(),
+    studyOrientation: z.enum(['word-to-def', 'def-to-word']),
+    learningReveal: z.enum(['minimal', 'rich']),
+  }),
+});
+
+export type Deck = z.infer<typeof DeckSchema>;
+
 // Word model
 export const WordSchema = z.object({
   id: z.string(),
@@ -15,6 +53,7 @@ export const WordSchema = z.object({
   freq: z.number().default(3.0),
   created_at: z.number(),
   updated_at: z.number(),
+  deck_id: z.string(),
 });
 
 export type Word = z.infer<typeof WordSchema>;
@@ -50,8 +89,17 @@ export interface WordWithScheduling {
   scheduling: SchedulingData;
 }
 
-// CSV import row
-export const CsvRowSchema = z.object({
+// CSV import rows
+// Simple profile: headword + translation only
+export const SimpleCsvRowSchema = z.object({
+  headword: z.string().min(1),
+  translation: z.string().min(1),
+});
+
+export type SimpleCsvRow = z.infer<typeof SimpleCsvRowSchema>;
+
+// Full profile: all fields
+export const FullCsvRowSchema = z.object({
   headword: z.string().min(1),
   pos: z.string().optional().default(''),
   ipa: z.string().optional().default(''),
@@ -64,7 +112,11 @@ export const CsvRowSchema = z.object({
   freq: z.coerce.number().optional().default(3.0),
 });
 
-export type CsvRow = z.infer<typeof CsvRowSchema>;
+export type FullCsvRow = z.infer<typeof FullCsvRowSchema>;
+
+// Legacy alias for backwards compatibility
+export const CsvRowSchema = FullCsvRowSchema;
+export type CsvRow = FullCsvRow;
 
 // Settings
 export interface Settings {

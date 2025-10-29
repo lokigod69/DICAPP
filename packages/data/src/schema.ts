@@ -2,7 +2,7 @@
  * Database schema - same SQL for both SQLite and sql.js
  */
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const MIGRATIONS = [
   // Migration 1: Initial schema
@@ -61,6 +61,42 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 INSERT OR IGNORE INTO schema_version (version) VALUES (1);
+  `,
+  // Migration 2: Multi-deck support
+  `
+-- Decks table with per-deck configuration
+CREATE TABLE IF NOT EXISTS decks (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  profile TEXT NOT NULL CHECK(profile IN ('simple', 'full')),
+  created_at INTEGER NOT NULL,
+  config_json TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_decks_slug ON decks(slug);
+
+-- Add deck_id to words table
+ALTER TABLE words ADD COLUMN deck_id TEXT REFERENCES decks(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_words_deck ON words(deck_id);
+
+-- Create default deck and assign all existing words to it
+INSERT OR IGNORE INTO decks (id, name, slug, profile, created_at, config_json)
+VALUES (
+  'default',
+  'Default Deck',
+  'default',
+  'full',
+  ${Date.now()},
+  '{"newPerDay":10,"dueLimit":20,"leechThreshold":8,"studyOrientation":"word-to-def","learningReveal":"minimal"}'
+);
+
+-- Assign all existing words to default deck
+UPDATE words SET deck_id = 'default' WHERE deck_id IS NULL;
+
+-- Update schema version
+UPDATE schema_version SET version = 2 WHERE version = 1;
+INSERT OR IGNORE INTO schema_version (version) VALUES (2);
   `,
 ];
 
