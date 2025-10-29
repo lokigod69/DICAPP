@@ -1,6 +1,8 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { getDataStore } from '$lib/stores/database';
+  import { deckStore } from '$lib/stores/deck';
   import { parseCsv, previewCsv, type CsvError } from '@runedeck/core/csv';
   import { ArrowLeft, Upload, CheckCircle, AlertCircle } from 'lucide-svelte';
 
@@ -13,6 +15,14 @@
   let imported = false;
   let validCount = 0;
   let invalidCount = 0;
+  let selectedDeckId = '';
+  let loading = true;
+
+  onMount(async () => {
+    await deckStore.load();
+    selectedDeckId = $deckStore.currentDeckId || '';
+    loading = false;
+  });
 
   async function handleFileSelect(e: Event) {
     const target = e.target as HTMLInputElement;
@@ -33,7 +43,10 @@
   }
 
   async function importCsv() {
-    if (!csvContent) return;
+    if (!csvContent || !selectedDeckId) {
+      alert('Please select a deck first');
+      return;
+    }
 
     importing = true;
 
@@ -44,8 +57,11 @@
       errors = result.errors;
 
       if (result.words.length > 0) {
+        // Assign all words to selected deck
+        const wordsWithDeck = result.words.map(w => ({ ...w, deck_id: selectedDeckId }));
+
         const dataStore = await getDataStore();
-        await dataStore.batchImportWords(result.words);
+        await dataStore.batchImportWords(wordsWithDeck);
         imported = true;
 
         // Redirect home after success
@@ -95,6 +111,22 @@
 
       <div class="w-24"></div>
     </div>
+
+    <!-- Deck Selector -->
+    {#if !loading && !imported}
+      <div class="mb-6 p-4 rounded-lg" style="background: var(--card-bg); border: 1px solid var(--card-border)">
+        <label class="block mb-2 font-semibold">Target Deck:</label>
+        <select
+          bind:value={selectedDeckId}
+          class="w-full px-4 py-2 rounded border"
+          style="background: var(--bg); border-color: var(--card-border); color: var(--fg)"
+        >
+          {#each $deckStore.decks as deck}
+            <option value={deck.id}>{deck.name}</option>
+          {/each}
+        </select>
+      </div>
+    {/if}
 
     {#if imported}
       <!-- Success message -->

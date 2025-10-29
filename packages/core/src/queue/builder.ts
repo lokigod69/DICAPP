@@ -29,14 +29,15 @@ export interface QueueResult {
  */
 export async function buildQueue(
   store: IDataStore,
+  deckId: string,
   config = DEFAULT_QUEUE_CONFIG
 ): Promise<QueueResult> {
   const { dueLimit, newPerDay, leechThreshold } = config;
 
   const [due, fresh, leeches] = await Promise.all([
-    store.getDue(dueLimit),
-    store.getNew(newPerDay),
-    store.getLeeches(leechThreshold),
+    store.getDue(deckId, dueLimit),
+    store.getNew(deckId, newPerDay),
+    store.getLeeches(deckId, leechThreshold),
   ]);
 
   // Combine due and new cards

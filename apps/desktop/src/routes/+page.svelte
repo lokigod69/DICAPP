@@ -2,11 +2,13 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { getDataStore } from '$lib/stores/database';
+  import { deckStore } from '$lib/stores/deck';
   import { Home } from 'lucide-svelte';
 
   let stats = {
     total: 0,
     new: 0,
+    due: 0,
     learning: 0,
     retention: 0,
     leeches: 0,
@@ -16,8 +18,18 @@
 
   onMount(async () => {
     try {
+      // Load decks and select current/default
+      await deckStore.load();
+
+      const currentDeckId = $deckStore.currentDeckId;
+      if (!currentDeckId) {
+        error = 'No deck selected. Please create a deck first.';
+        loading = false;
+        return;
+      }
+
       const dataStore = await getDataStore();
-      stats = await dataStore.getStats();
+      stats = await dataStore.getDeckStats(currentDeckId);
       loading = false;
     } catch (err: any) {
       error = err.message;
@@ -47,7 +59,7 @@
     <!-- Header -->
     <div class="text-center mb-12">
       <h1 class="text-6xl font-display font-bold mb-4" style="color: var(--accent-1)">
-        RuneDeck
+        DIC APP
       </h1>
       <p class="text-xl" style="color: var(--muted)">
         Advanced vocabulary training with spaced repetition

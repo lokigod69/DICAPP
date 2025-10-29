@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { getDataStore } from '$lib/stores/database';
+  import { deckStore } from '$lib/stores/deck';
   import { settingsStore } from '$lib/stores/settings';
   import type { WordWithScheduling } from '@runedeck/core/models';
   import type { IDataStore } from '@runedeck/data';
@@ -12,15 +13,26 @@
   let editedMnemonic = '';
   let loading = true;
   let saving = false;
+  let error = '';
   let dataStore: IDataStore | null = null;
 
   onMount(async () => {
     try {
+      await deckStore.load();
+      const currentDeckId = $deckStore.currentDeckId;
+
+      if (!currentDeckId) {
+        error = 'No deck selected.';
+        loading = false;
+        return;
+      }
+
       dataStore = await getDataStore();
-      leeches = await dataStore.getLeeches($settingsStore.leechThreshold);
+      leeches = await dataStore.getLeeches(currentDeckId, $settingsStore.leechThreshold);
       loading = false;
     } catch (err: any) {
       console.error('Failed to load leeches:', err);
+      error = err.message;
       loading = false;
     }
   });

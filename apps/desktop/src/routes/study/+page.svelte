@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { studyStore, isComplete } from '$lib/stores/study';
   import { getDataStore } from '$lib/stores/database';
+  import { deckStore } from '$lib/stores/deck';
   import { settingsStore } from '$lib/stores/settings';
   import { buildQueue } from '@runedeck/core/queue';
   import { gradeCard, modeOf } from '@runedeck/core/scheduler';
@@ -20,16 +21,26 @@
 
   onMount(async () => {
     try {
+      // Load deck first
+      await deckStore.load();
+      const currentDeckId = $deckStore.currentDeckId;
+
+      if (!currentDeckId) {
+        error = 'No deck selected. Please select a deck first.';
+        loading = false;
+        return;
+      }
+
       dataStore = await getDataStore();
 
-      // Build study queue
+      // Build study queue for current deck
       const config = {
         dueLimit: $settingsStore.dueLimit,
         newPerDay: $settingsStore.newPerDay,
         leechThreshold: $settingsStore.leechThreshold,
       };
 
-      const { cards } = await buildQueue(dataStore, config);
+      const { cards } = await buildQueue(dataStore, currentDeckId, config);
 
       if (cards.length === 0) {
         error = 'No cards due for review. Check back later!';
