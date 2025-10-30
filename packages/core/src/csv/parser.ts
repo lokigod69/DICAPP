@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import { CsvRowSchema, type CsvRow, type Word } from '../models/types';
+import { SimpleCsvRowSchema, FullCsvRowSchema, type SimpleCsvRow, type FullCsvRow, type Word, type DeckProfile } from '../models/types';
 import { createWord, parseTags } from '../models/utils';
 
 /**
@@ -13,51 +13,108 @@ export interface CsvError {
 }
 
 /**
- * CSV parse result
+ * CSV parse result with profile detection
  */
 export interface CsvParseResult {
+  profile: DeckProfile;
   words: Word[];
   errors: CsvError[];
   valid: number;
   invalid: number;
+  missing: string[];
+  warnings: string[];
 }
 
 /**
- * Parse CSV file to Words
+ * Detect CSV profile from headers
  */
-export function parseCsv(csvContent: string): CsvParseResult {
+export function detectProfile(headers: string[]): { profile: DeckProfile; missing: string[] } {
+  const normalized = headers.map(h => h.trim().toLowerCase());
+
+  // Simple profile: exactly headword + translation
+  const hasHeadword = normalized.includes('headword');
+  const hasTranslation = normalized.includes('translation');
+
+  // Full profile: headword + definition required
+  const hasDefinition = normalized.includes('definition');
+
+  if (hasHeadword && hasTranslation && !hasDefinition) {
+    return { profile: 'simple', missing: [] };
+  }
+
+  if (hasHeadword && hasDefinition) {
+    return { profile: 'full', missing: [] };
+  }
+
+  // Missing required fields
+  const missing: string[] = [];
+  if (!hasHeadword) missing.push('headword');
+  if (!hasDefinition && !hasTranslation) missing.push('definition or translation');
+
+  // Default to full if headers look like full schema
+  return { profile: 'full', missing };
+}
+
+/**
+ * Parse CSV file to Words with profile detection
+ */
+export function parseCsv(csvContent: string, deckId: string): CsvParseResult {
   const words: Word[] = [];
   const errors: CsvError[] = [];
+  const warnings: string[] = [];
 
-  const parseResult = Papa.parse<CsvRow>(csvContent, {
+  const parseResult = Papa.parse<any>(csvContent, {
     header: true,
     skipEmptyLines: true,
     transformHeader: (header) => header.trim().toLowerCase(),
   });
 
+  // Detect profile from headers
+  const headers = parseResult.meta.fields || [];
+  const { profile, missing } = detectProfile(headers);
+
+  if (missing.length > 0) {
+    warnings.push(`Missing required columns: ${missing.join(', ')}`);
+  }
+
+  // Parse rows based on profile
   parseResult.data.forEach((row, idx) => {
     const rowNumber = idx + 2; // +1 for 0-index, +1 for header row
 
     try {
-      // Validate row with Zod
-      const validatedRow = CsvRowSchema.parse(row);
+      let word: Word;
 
-      // Parse tags
-      const tags = parseTags(validatedRow.tags);
+      if (profile === 'simple') {
+        // Validate as simple row
+        const validatedRow = SimpleCsvRowSchema.parse(row);
 
-      // Create Word
-      const word = createWord({
-        headword: validatedRow.headword,
-        pos: validatedRow.pos || undefined,
-        ipa: validatedRow.ipa || undefined,
-        definition: validatedRow.definition,
-        example: validatedRow.example || undefined,
-        gloss_de: validatedRow.gloss_de || undefined,
-        etymology: validatedRow.etymology || undefined,
-        mnemonic: validatedRow.mnemonic || undefined,
-        tags,
-        freq: validatedRow.freq,
-      });
+        // Map translation to definition for simple profile
+        word = createWord({
+          headword: validatedRow.headword,
+          definition: validatedRow.translation, // translation becomes definition
+          deck_id: deckId,
+        });
+      } else {
+        // Validate as full row
+        const validatedRow = FullCsvRowSchema.parse(row);
+
+        // Parse tags
+        const tags = parseTags(validatedRow.tags || '');
+
+        word = createWord({
+          headword: validatedRow.headword,
+          pos: validatedRow.pos || undefined,
+          ipa: validatedRow.ipa || undefined,
+          definition: validatedRow.definition,
+          example: validatedRow.example || undefined,
+          gloss_de: validatedRow.gloss_de || undefined,
+          etymology: validatedRow.etymology || undefined,
+          mnemonic: validatedRow.mnemonic || undefined,
+          tags,
+          freq: validatedRow.freq,
+          deck_id: deckId,
+        });
+      }
 
       words.push(word);
     } catch (error: any) {
@@ -72,11 +129,19 @@ export function parseCsv(csvContent: string): CsvParseResult {
     }
   });
 
+  // Add profile-specific warnings
+  if (profile === 'simple') {
+    warnings.push('Simple profile detected: "translation" column will be mapped to "definition"');
+  }
+
   return {
+    profile,
     words,
     errors,
     valid: words.length,
     invalid: errors.length,
+    missing,
+    warnings,
   };
 }
 

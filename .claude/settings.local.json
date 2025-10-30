@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(mkdir:*)",
-      "Bash(where:*)"
+      "Bash(where:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: multi-deck Part 2 - unbreak callers and add UI wiring\n\n**Phase 1 Complete: Unbreak and Align**\n\n**SqliteStore (Desktop) Parity:**\n- Added all 7 deck CRUD methods matching WasmSqliteStore\n- Updated word methods to include deck_id in INSERT/UPDATE\n- Made query methods deck-aware (getDue, getNew, getLeeches)\n- Added mapRowToDeck mapper\n\n**DeckStore (UI State):**\n- Created Svelte store for deck selection and list management\n- Auto-selects default deck or first available on load\n- Persists currentDeckId to localStorage\n- Provides refresh() and getCurrentDeck() helpers\n- Derived currentDeck store for reactive access\n\n**Updated All Callers:**\n- Home: loads deck, calls getDeckStats(deckId)\n- Study: loads deck, passes deckId to buildQueue()\n- Clinic: loads deck, passes deckId to getLeeches()\n- Import: deck selector dropdown, assigns deck_id to imported words\n- buildQueue(): now requires deckId parameter\n\n**Brand Update:**\n- Changed \"RuneDeck\" to \"DIC APP\" in home page title\n\n**App Status:**\n- Migration 2 will run on first load (creates default deck)\n- All existing words assigned to default deck\n- App now boots without crashes\n- Deck-scoped queries working correctly\n\n**Next Steps (Phase 2):**\n- Refactor CSV parser for simple/full profiles\n- Build Decks page with stats grid\n- Add header deck switcher\n- Create seed CSV files\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []

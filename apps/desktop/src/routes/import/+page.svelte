@@ -17,6 +17,8 @@
   let invalidCount = 0;
   let selectedDeckId = '';
   let loading = true;
+  let detectedProfile: 'simple' | 'full' | null = null;
+  let warnings: string[] = [];
 
   onMount(async () => {
     await deckStore.load();
@@ -51,17 +53,17 @@
     importing = true;
 
     try {
-      const result = parseCsv(csvContent);
+      // Parse with profile detection and deck assignment
+      const result = parseCsv(csvContent, selectedDeckId);
       validCount = result.valid;
       invalidCount = result.invalid;
       errors = result.errors;
+      detectedProfile = result.profile;
+      warnings = result.warnings;
 
       if (result.words.length > 0) {
-        // Assign all words to selected deck
-        const wordsWithDeck = result.words.map(w => ({ ...w, deck_id: selectedDeckId }));
-
         const dataStore = await getDataStore();
-        await dataStore.batchImportWords(wordsWithDeck);
+        await dataStore.batchImportWords(result.words);
         imported = true;
 
         // Redirect home after success
@@ -162,19 +164,60 @@
           Click to browse or drag and drop
         </p>
         <p class="text-sm" style="color: var(--muted); opacity: 0.7">
-          Expected columns: headword, pos, ipa, definition, example, gloss_de, etymology, mnemonic, tags, freq
+          Supports two profiles: <strong>Simple</strong> (headword, translation) or <strong>Full</strong> (all fields)
         </p>
       </div>
 
-      <!-- Format example -->
-      <div class="mt-8 p-6 rounded-lg" style="background: var(--card-bg); border: 1px solid var(--card-border)">
-        <h3 class="font-semibold mb-3">CSV Format Example:</h3>
-        <pre class="text-xs font-mono overflow-x-auto" style="color: var(--muted)">headword,pos,ipa,definition,example,gloss_de,etymology,mnemonic,tags,freq
+      <!-- Format examples -->
+      <div class="mt-8 space-y-4">
+        <div class="p-6 rounded-lg" style="background: var(--card-bg); border: 1px solid var(--card-border)">
+          <h3 class="font-semibold mb-2 flex items-center gap-2">
+            <span class="px-2 py-1 rounded text-xs" style="background: var(--accent-2); color: var(--bg)">SIMPLE</span>
+            Minimal Format (2 columns)
+          </h3>
+          <pre class="text-xs font-mono overflow-x-auto mt-3" style="color: var(--muted)">headword,translation
+hello,Hallo
+goodbye,Auf Wiedersehen</pre>
+        </div>
+
+        <div class="p-6 rounded-lg" style="background: var(--card-bg); border: 1px solid var(--card-border)">
+          <h3 class="font-semibold mb-2 flex items-center gap-2">
+            <span class="px-2 py-1 rounded text-xs" style="background: var(--accent-1); color: var(--bg)">FULL</span>
+            Rich Format (10 columns)
+          </h3>
+          <pre class="text-xs font-mono overflow-x-auto mt-3" style="color: var(--muted)">headword,pos,ipa,definition,example,gloss_de,etymology,mnemonic,tags,freq
 susurrus,n.,/suˈsʌr.əs/,a soft murmuring,A susurrus rose,Flüstern,&lt;Latin&gt;,ssss snakes,poetic;nature,2.8</pre>
+        </div>
       </div>
     {:else}
       <!-- Preview -->
       <div class="space-y-6">
+        <!-- Profile Badge and Warnings -->
+        {#if detectedProfile}
+          <div class="p-4 rounded-lg" style="background: var(--card-bg); border: 1px solid var(--card-border)">
+            <div class="flex items-center gap-3 mb-2">
+              <span class="px-3 py-1 rounded text-xs font-semibold" style="background: {detectedProfile === 'simple' ? 'var(--accent-2)' : 'var(--accent-1)'}; color: var(--bg)">
+                {detectedProfile.toUpperCase()} PROFILE
+              </span>
+              {#if detectedProfile === 'simple'}
+                <span class="text-sm" style="color: var(--muted)">Headword + Translation (minimal fields)</span>
+              {:else}
+                <span class="text-sm" style="color: var(--muted)">Full schema with all fields</span>
+              {/if}
+            </div>
+            {#if warnings.length > 0}
+              <div class="mt-2 space-y-1">
+                {#each warnings as warning}
+                  <div class="text-sm flex items-start gap-2" style="color: var(--muted)">
+                    <AlertCircle size={16} class="mt-0.5 flex-shrink-0" />
+                    <span>{warning}</span>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
+
         <!-- Stats -->
         <div class="flex gap-4">
           <div class="flex-1 p-4 rounded-lg" style="background: var(--card-bg); border: 1px solid var(--card-border)">
