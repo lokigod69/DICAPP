@@ -52,6 +52,10 @@
   function goToSettings() {
     goto('/settings');
   }
+
+  function goToDecks() {
+    goto('/decks');
+  }
 </script>
 
 <div class="min-h-screen flex items-center justify-center p-8">
@@ -106,7 +110,15 @@
           Start Review
         </button>
 
-        <div class="grid grid-cols-3 gap-4">
+        <div class="grid grid-cols-2 gap-4">
+          <button
+            on:click={goToDecks}
+            class="py-3 px-4 rounded-lg font-medium transition-all hover:scale-[1.02]"
+            style="background: var(--accent-2); color: var(--bg)"
+          >
+            Manage Decks
+          </button>
+
           <button
             on:click={goToImport}
             class="py-3 px-4 rounded-lg font-medium transition-all hover:scale-[1.02]"

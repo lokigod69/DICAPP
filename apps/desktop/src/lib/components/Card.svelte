@@ -215,9 +215,10 @@
     transition: opacity 0.3s ease;
   }
 
-  .card-frame:hover .foil-sweep {
+  /* Foil sweep only on reveal, not infinite */
+  [data-revealed="true"] .foil-sweep {
     opacity: 1;
-    animation: sweep 2s ease-in-out infinite;
+    animation: sweep 0.8s ease-out forwards;
   }
 
   @keyframes sweep {
@@ -226,6 +227,7 @@
     }
     to {
       transform: translateX(100%);
+      opacity: 0;
     }
   }
 

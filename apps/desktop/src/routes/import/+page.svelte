@@ -4,6 +4,7 @@
   import { getDataStore } from '$lib/stores/database';
   import { deckStore } from '$lib/stores/deck';
   import { parseCsv, previewCsv, type CsvError } from '@runedeck/core/csv';
+  import { createDeck } from '@runedeck/core/models';
   import { ArrowLeft, Upload, CheckCircle, AlertCircle } from 'lucide-svelte';
 
   let fileInput: HTMLInputElement;
@@ -19,6 +20,9 @@
   let loading = true;
   let detectedProfile: 'simple' | 'full' | null = null;
   let warnings: string[] = [];
+  let fileName = '';
+  let createNewDeck = false;
+  let newDeckName = '';
 
   onMount(async () => {
     await deckStore.load();
@@ -34,6 +38,9 @@
 
     try {
       csvContent = await file.text();
+      fileName = file.name.replace(/\.csv$/i, ''); // Remove .csv extension
+      newDeckName = fileName; // Default new deck name to file name
+
       const { preview: previewData, total } = previewCsv(csvContent, 20);
       preview = previewData;
       totalRows = total;
@@ -45,16 +52,45 @@
   }
 
   async function importCsv() {
-    if (!csvContent || !selectedDeckId) {
-      alert('Please select a deck first');
+    if (!csvContent) {
+      alert('No CSV loaded');
+      return;
+    }
+
+    if (!createNewDeck && !selectedDeckId) {
+      alert('Please select a deck or choose to create a new one');
       return;
     }
 
     importing = true;
 
     try {
+      const dataStore = await getDataStore();
+      let targetDeckId = selectedDeckId;
+
+      // Create new deck if requested
+      if (createNewDeck) {
+        if (!newDeckName.trim()) {
+          alert('Please enter a deck name');
+          importing = false;
+          return;
+        }
+
+        const newDeck = createDeck({
+          name: newDeckName.trim(),
+          profile: detectedProfile || 'full',
+        });
+
+        await dataStore.createDeck(newDeck);
+        targetDeckId = newDeck.id;
+
+        // Reload decks and set as current
+        await deckStore.load();
+        await deckStore.setCurrent(targetDeckId);
+      }
+
       // Parse with profile detection and deck assignment
-      const result = parseCsv(csvContent, selectedDeckId);
+      const result = parseCsv(csvContent, targetDeckId);
       validCount = result.valid;
       invalidCount = result.invalid;
       errors = result.errors;
@@ -62,7 +98,6 @@
       warnings = result.warnings;
 
       if (result.words.length > 0) {
-        const dataStore = await getDataStore();
         await dataStore.batchImportWords(result.words);
         imported = true;
 
@@ -117,16 +152,57 @@
     <!-- Deck Selector -->
     {#if !loading && !imported}
       <div class="mb-6 p-4 rounded-lg" style="background: var(--card-bg); border: 1px solid var(--card-border)">
-        <label class="block mb-2 font-semibold">Target Deck:</label>
-        <select
-          bind:value={selectedDeckId}
-          class="w-full px-4 py-2 rounded border"
-          style="background: var(--bg); border-color: var(--card-border); color: var(--fg)"
-        >
-          {#each $deckStore.decks as deck}
-            <option value={deck.id}>{deck.name}</option>
-          {/each}
-        </select>
+        <label class="block mb-3 font-semibold">Target Deck:</label>
+
+        <!-- Radio buttons for deck selection mode -->
+        <div class="flex gap-6 mb-4">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              bind:group={createNewDeck}
+              value={false}
+              class="accent-current"
+            />
+            <span class="text-sm">Import to existing deck</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              bind:group={createNewDeck}
+              value={true}
+              class="accent-current"
+            />
+            <span class="text-sm">Create new deck from file</span>
+          </label>
+        </div>
+
+        {#if createNewDeck}
+          <!-- New deck name input -->
+          <div>
+            <label class="block mb-2 text-sm" style="color: var(--muted)">New Deck Name:</label>
+            <input
+              type="text"
+              bind:value={newDeckName}
+              placeholder="Enter deck name..."
+              class="w-full px-4 py-2 rounded border"
+              style="background: var(--bg); border-color: var(--card-border); color: var(--fg)"
+            />
+            <p class="text-xs mt-1" style="color: var(--muted)">
+              Default: "{fileName}"
+            </p>
+          </div>
+        {:else}
+          <!-- Existing deck selector -->
+          <select
+            bind:value={selectedDeckId}
+            class="w-full px-4 py-2 rounded border"
+            style="background: var(--bg); border-color: var(--card-border); color: var(--fg)"
+          >
+            {#each $deckStore.decks as deck}
+              <option value={deck.id}>{deck.name}</option>
+            {/each}
+          </select>
+        {/if}
       </div>
     {/if}
 
