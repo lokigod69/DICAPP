@@ -1,4 +1,4 @@
-import type { Word, SchedulingData, Review, WordWithScheduling, Deck } from '@runedeck/core/models';
+import type { Word, SchedulingData, Review, WordWithScheduling, Deck, StudyScope } from '@runedeck/core/models';
 import { createInitialScheduling } from '@runedeck/core/models';
 import type { IDataStore } from './IDataStore';
 import { MIGRATIONS, SCHEMA_VERSION, serializeTags, deserializeTags } from './schema';
@@ -342,6 +342,149 @@ export class SqliteStore implements IDataStore {
     );
 
     return rows.map((row) => this.mapRowToWordWithScheduling(row));
+  }
+
+  // === Scope Queries (Multi-Deck) ===
+
+  private async resolveScopeDeckIds(scope: StudyScope, currentDeckId: string): Promise<string[]> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    if (scope.type === 'all') {
+      const decks = await this.db.select<{ id: string }>('SELECT id FROM decks', []);
+      return decks.map((row) => row.id);
+    }
+    if (scope.type === 'current') {
+      return [currentDeckId];
+    }
+    return scope.deckIds;
+  }
+
+  async getDueByScope(
+    scope: StudyScope,
+    currentDeckId: string,
+    limit: number,
+    now = Date.now()
+  ): Promise<WordWithScheduling[]> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const deckIds = await this.resolveScopeDeckIds(scope, currentDeckId);
+    if (deckIds.length === 0) return [];
+
+    const placeholders = deckIds.map(() => '?').join(',');
+    const rows = await this.db.select<any>(
+      `SELECT w.*, s.word_id as sched_word_id, s.due_ts, s.interval, s.ease, s.lapses, s.is_new
+       FROM words w
+       INNER JOIN scheduling s ON w.id = s.word_id
+       WHERE w.deck_id IN (${placeholders}) AND s.due_ts <= ? AND s.is_new = 0
+       ORDER BY s.due_ts ASC
+       LIMIT ?`,
+      [...deckIds, now, limit]
+    );
+
+    return rows.map((row) => this.mapRowToWordWithScheduling(row));
+  }
+
+  async getNewByScope(
+    scope: StudyScope,
+    currentDeckId: string,
+    limit: number
+  ): Promise<WordWithScheduling[]> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const deckIds = await this.resolveScopeDeckIds(scope, currentDeckId);
+    if (deckIds.length === 0) return [];
+
+    const placeholders = deckIds.map(() => '?').join(',');
+    const rows = await this.db.select<any>(
+      `SELECT w.*, s.word_id as sched_word_id, s.due_ts, s.interval, s.ease, s.lapses, s.is_new
+       FROM words w
+       INNER JOIN scheduling s ON w.id = s.word_id
+       WHERE w.deck_id IN (${placeholders}) AND s.is_new = 1
+       ORDER BY w.created_at ASC
+       LIMIT ?`,
+      [...deckIds, limit]
+    );
+
+    return rows.map((row) => this.mapRowToWordWithScheduling(row));
+  }
+
+  async getLeechesByScope(
+    scope: StudyScope,
+    currentDeckId: string,
+    threshold: number
+  ): Promise<WordWithScheduling[]> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const deckIds = await this.resolveScopeDeckIds(scope, currentDeckId);
+    if (deckIds.length === 0) return [];
+
+    const placeholders = deckIds.map(() => '?').join(',');
+    const rows = await this.db.select<any>(
+      `SELECT w.*, s.word_id as sched_word_id, s.due_ts, s.interval, s.ease, s.lapses, s.is_new
+       FROM words w
+       INNER JOIN scheduling s ON w.id = s.word_id
+       WHERE w.deck_id IN (${placeholders}) AND s.lapses >= ?
+       ORDER BY s.lapses DESC`,
+      [...deckIds, threshold]
+    );
+
+    return rows.map((row) => this.mapRowToWordWithScheduling(row));
+  }
+
+  async getStatsByScope(scope: StudyScope, currentDeckId: string): Promise<{
+    total: number;
+    new: number;
+    due: number;
+    learning: number;
+    retention: number;
+    leeches: number;
+  }> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const deckIds = await this.resolveScopeDeckIds(scope, currentDeckId);
+    if (deckIds.length === 0) {
+      return { total: 0, new: 0, due: 0, learning: 0, retention: 0, leeches: 0 };
+    }
+
+    const placeholders = deckIds.map(() => '?').join(',');
+    const now = Date.now();
+
+    const total = (await this.db.select<{ count: number }>(
+      `SELECT COUNT(*) as count FROM words WHERE deck_id IN (${placeholders})`,
+      deckIds
+    ))[0].count;
+
+    const newCount = (await this.db.select<{ count: number }>(
+      `SELECT COUNT(*) as count FROM scheduling s
+       INNER JOIN words w ON s.word_id = w.id
+       WHERE w.deck_id IN (${placeholders}) AND s.is_new = 1`,
+      deckIds
+    ))[0].count;
+
+    const due = (await this.db.select<{ count: number }>(
+      `SELECT COUNT(*) as count FROM scheduling s
+       INNER JOIN words w ON s.word_id = w.id
+       WHERE w.deck_id IN (${placeholders}) AND s.due_ts <= ? AND s.is_new = 0`,
+      [...deckIds, now]
+    ))[0].count;
+
+    const learning = (await this.db.select<{ count: number }>(
+      `SELECT COUNT(*) as count FROM scheduling s
+       INNER JOIN words w ON s.word_id = w.id
+       WHERE w.deck_id IN (${placeholders}) AND s.interval > 0 AND s.interval < 21`,
+      deckIds
+    ))[0].count;
+
+    const leeches = (await this.db.select<{ count: number }>(
+      `SELECT COUNT(*) as count FROM scheduling s
+       INNER JOIN words w ON s.word_id = w.id
+       WHERE w.deck_id IN (${placeholders}) AND s.lapses >= 8`,
+      deckIds
+    ))[0].count;
+
+    const retention = total > 0 ? Math.round(((total - newCount - leeches) / total) * 100) : 0;
+
+    return { total, new: newCount, due, learning, retention, leeches };
   }
 
   // === Reviews ===

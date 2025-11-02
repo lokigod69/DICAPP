@@ -1,5 +1,5 @@
 import type { IDataStore } from '../../data/src/IDataStore';
-import type { Word, SchedulingData, WordWithScheduling } from '../models/types';
+import type { Word, SchedulingData, WordWithScheduling, StudyScope } from '../models/types';
 
 /**
  * Queue configuration
@@ -26,6 +26,7 @@ export interface QueueResult {
 
 /**
  * Build study queue with due cards and new cards
+ * @deprecated Use buildQueueByScope instead
  */
 export async function buildQueue(
   store: IDataStore,
@@ -38,6 +39,29 @@ export async function buildQueue(
     store.getDue(deckId, dueLimit),
     store.getNew(deckId, newPerDay),
     store.getLeeches(deckId, leechThreshold),
+  ]);
+
+  // Combine due and new cards
+  const cards = [...due, ...fresh];
+
+  return { cards, leeches };
+}
+
+/**
+ * Build study queue using StudyScope (multi-deck support)
+ */
+export async function buildQueueByScope(
+  store: IDataStore,
+  scope: StudyScope,
+  currentDeckId: string,
+  config = DEFAULT_QUEUE_CONFIG
+): Promise<QueueResult> {
+  const { dueLimit, newPerDay, leechThreshold } = config;
+
+  const [due, fresh, leeches] = await Promise.all([
+    store.getDueByScope(scope, currentDeckId, dueLimit),
+    store.getNewByScope(scope, currentDeckId, newPerDay),
+    store.getLeechesByScope(scope, currentDeckId, leechThreshold),
   ]);
 
   // Combine due and new cards

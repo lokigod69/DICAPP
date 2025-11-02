@@ -83,6 +83,12 @@ export type Review = z.infer<typeof ReviewSchema>;
 
 export type Grade = 1 | 2 | 3 | 4;
 
+// Study scope for multi-deck support
+export type StudyScope =
+  | { type: 'all' }
+  | { type: 'current' }
+  | { type: 'decks'; deckIds: string[] };
+
 // Combined types for queries
 export interface WordWithScheduling {
   word: Word;

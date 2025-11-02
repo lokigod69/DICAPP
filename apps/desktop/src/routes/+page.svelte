@@ -3,7 +3,8 @@
   import { goto } from '$app/navigation';
   import { getDataStore } from '$lib/stores/database';
   import { deckStore } from '$lib/stores/deck';
-  import { Home } from 'lucide-svelte';
+  import { scopeStore } from '$lib/stores/scope';
+  import Header from '$lib/components/Header.svelte';
 
   let stats = {
     total: 0,
@@ -16,11 +17,8 @@
   let loading = true;
   let error = '';
 
-  onMount(async () => {
+  async function loadStats() {
     try {
-      // Load decks and select current/default
-      await deckStore.load();
-
       const currentDeckId = $deckStore.currentDeckId;
       if (!currentDeckId) {
         error = 'No deck selected. Please create a deck first.';
@@ -29,13 +27,24 @@
       }
 
       const dataStore = await getDataStore();
-      stats = await dataStore.getDeckStats(currentDeckId);
+      stats = await dataStore.getStatsByScope($scopeStore, currentDeckId);
       loading = false;
     } catch (err: any) {
       error = err.message;
       loading = false;
     }
+  }
+
+  onMount(async () => {
+    // Load decks and select current/default
+    await deckStore.load();
+    await loadStats();
   });
+
+  // Reload stats when scope changes
+  $: if ($scopeStore && $deckStore.currentDeckId) {
+    loadStats();
+  }
 
   function startReview() {
     goto('/study');
@@ -58,9 +67,11 @@
   }
 </script>
 
+<Header />
+
 <div class="min-h-screen flex items-center justify-center p-8">
   <div class="max-w-2xl w-full">
-    <!-- Header -->
+    <!-- Title Section -->
     <div class="text-center mb-12">
       <h1 class="text-6xl font-display font-bold mb-4" style="color: var(--accent-1)">
         DIC APP
@@ -68,6 +79,11 @@
       <p class="text-xl" style="color: var(--muted)">
         Advanced vocabulary training with spaced repetition
       </p>
+      {#if $scopeStore.type === 'all'}
+        <p class="text-sm mt-2" style="color: var(--accent-2)">
+          Studying across all {$deckStore.decks.length} decks
+        </p>
+      {/if}
     </div>
 
     {#if loading}
@@ -150,7 +166,7 @@
       <!-- Total count -->
       <div class="text-center mt-8">
         <p class="text-sm" style="color: var(--muted)">
-          {stats.total} {stats.total === 1 ? 'word' : 'words'} in deck
+          {stats.total} {stats.total === 1 ? 'word' : 'words'} in {$scopeStore.type === 'all' ? 'all decks' : 'current deck'}
         </p>
       </div>
     {/if}

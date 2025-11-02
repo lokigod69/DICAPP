@@ -1,4 +1,4 @@
-import type { Word, SchedulingData, Review, WordWithScheduling, Deck } from '@runedeck/core/models';
+import type { Word, SchedulingData, Review, WordWithScheduling, Deck, StudyScope } from '@runedeck/core/models';
 
 /**
  * Storage interface - implemented by both SQLite (desktop) and sql.js (web)
@@ -55,6 +55,35 @@ export interface IDataStore {
    * Get leeches (lapses >= threshold)
    */
   getLeeches(deckId: string, threshold: number): Promise<WordWithScheduling[]>;
+
+  // === Scope Queries (Multi-Deck) ===
+
+  /**
+   * Get due cards by scope
+   */
+  getDueByScope(scope: StudyScope, currentDeckId: string, limit: number, now?: number): Promise<WordWithScheduling[]>;
+
+  /**
+   * Get new cards by scope
+   */
+  getNewByScope(scope: StudyScope, currentDeckId: string, limit: number): Promise<WordWithScheduling[]>;
+
+  /**
+   * Get leeches by scope
+   */
+  getLeechesByScope(scope: StudyScope, currentDeckId: string, threshold: number): Promise<WordWithScheduling[]>;
+
+  /**
+   * Get stats by scope
+   */
+  getStatsByScope(scope: StudyScope, currentDeckId: string): Promise<{
+    total: number;
+    new: number;
+    due: number;
+    learning: number;
+    retention: number;
+    leeches: number;
+  }>;
 
   // === Reviews ===
 

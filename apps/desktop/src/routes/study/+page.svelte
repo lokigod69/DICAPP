@@ -4,14 +4,16 @@
   import { studyStore, isComplete } from '$lib/stores/study';
   import { getDataStore } from '$lib/stores/database';
   import { deckStore } from '$lib/stores/deck';
+  import { scopeStore } from '$lib/stores/scope';
   import { settingsStore } from '$lib/stores/settings';
-  import { buildQueue } from '@runedeck/core/queue';
+  import { buildQueueByScope } from '@runedeck/core/queue';
   import { gradeCard, modeOf } from '@runedeck/core/scheduler';
   import { uuid } from '@runedeck/core/models';
   import type { Grade } from '@runedeck/core/models';
   import type { IDataStore } from '@runedeck/data';
   import Card from '$lib/components/Card.svelte';
   import GradeButtons from '$lib/components/GradeButtons.svelte';
+  import Header from '$lib/components/Header.svelte';
   import { ArrowLeft } from 'lucide-svelte';
 
   let loading = true;
@@ -33,14 +35,14 @@
 
       dataStore = await getDataStore();
 
-      // Build study queue for current deck
+      // Build study queue using scope (supports multi-deck)
       const config = {
         dueLimit: $settingsStore.dueLimit,
         newPerDay: $settingsStore.newPerDay,
         leechThreshold: $settingsStore.leechThreshold,
       };
 
-      const { cards } = await buildQueue(dataStore, currentDeckId, config);
+      const { cards } = await buildQueueByScope(dataStore, $scopeStore, currentDeckId, config);
 
       if (cards.length === 0) {
         error = 'No cards due for review. Check back later!';
@@ -137,8 +139,10 @@
   }
 </script>
 
+<Header />
+
 <div class="min-h-screen flex flex-col">
-  <!-- Header -->
+  <!-- Progress Header -->
   <div class="p-4 flex items-center justify-between" style="background: var(--bg); border-bottom: 1px solid var(--card-border)">
     <button
       on:click={goHome}
