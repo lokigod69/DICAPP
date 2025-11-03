@@ -98,10 +98,18 @@
         body: formData,
       });
 
-      const result = await response.json();
+      // Parse JSON safely - server should always return JSON now
+      const text = await response.text();
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch {
+        throw new Error(`Import failed (${response.status}): ${text.slice(0, 200)}`);
+      }
 
-      if (!response.ok) {
-        throw new Error(result.message || 'Import failed');
+      // Check for errors
+      if (!response.ok || !result.ok) {
+        throw new Error(result?.message ?? `Import failed (${response.status})`);
       }
 
       importResult = result;

@@ -1,7 +1,9 @@
-// Server hooks for Supabase auth
-// Note: This is a minimal setup since we're using client-side auth primarily
-// For production, consider using @supabase/ssr for proper SSR auth handling
+import { supaFromEvent } from '$lib/supabase.server';
+import type { Handle } from '@sveltejs/kit';
 
-export async function handle({ event, resolve }) {
+export const handle: Handle = async ({ event, resolve }) => {
+  // Attach Supabase client to event.locals
+  event.locals.supabase = supaFromEvent(event);
+
   return resolve(event);
-}
+};

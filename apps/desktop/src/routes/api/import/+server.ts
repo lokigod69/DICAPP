@@ -1,38 +1,49 @@
-import { json, error } from '@sveltejs/kit';
-import { supaFromEvent } from '$lib/supabase.server';
+import { json } from '@sveltejs/kit';
 import { parseCsv } from '@runedeck/core/csv';
-import { createWord, createInitialScheduling } from '@runedeck/core/models';
+import { createInitialScheduling } from '@runedeck/core/models';
 import type { RequestHandler } from './$types';
 
-export const POST: RequestHandler = async (event) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
   try {
-    // Get Supabase client from cookies (includes user session)
-    const supabase = supaFromEvent(event);
-    const { data: { session } } = await supabase.auth.getSession();
+    // Get Supabase client from locals (set in hooks)
+    const supabase = locals.supabase;
 
-    if (!session) {
-      throw error(401, 'Unauthorized');
+    // Validate auth - always return JSON
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return json(
+        { ok: false, code: 401, message: 'Unauthorized - please sign in' },
+        { status: 401 }
+      );
     }
 
-    const user = session.user;
-
     // Parse form data
-    const formData = await event.request.formData();
+    const formData = await request.formData();
     const file = formData.get('file') as File;
     const deckId = formData.get('deckId') as string;
     const createDeck = formData.get('createDeck') === 'true';
     const newDeckName = formData.get('newDeckName') as string;
 
+    // Validation - return JSON errors
     if (!file) {
-      throw error(400, 'No file provided');
+      return json(
+        { ok: false, code: 400, message: 'No file provided' },
+        { status: 400 }
+      );
     }
 
     if (!createDeck && !deckId) {
-      throw error(400, 'No deck specified');
+      return json(
+        { ok: false, code: 400, message: 'No deck specified' },
+        { status: 400 }
+      );
     }
 
     if (createDeck && !newDeckName?.trim()) {
-      throw error(400, 'Deck name required');
+      return json(
+        { ok: false, code: 400, message: 'Deck name required' },
+        { status: 400 }
+      );
     }
 
     // Read CSV content
@@ -48,7 +59,10 @@ export const POST: RequestHandler = async (event) => {
     });
 
     if (uploadError) {
-      throw error(500, `Failed to upload file: ${uploadError.message}`);
+      return json(
+        { ok: false, code: 500, message: `Failed to upload file: ${uploadError.message}` },
+        { status: 500 }
+      );
     }
 
     // Determine target deck ID
@@ -84,7 +98,10 @@ export const POST: RequestHandler = async (event) => {
         .single();
 
       if (deckError) {
-        throw error(500, `Failed to create deck: ${deckError.message}`);
+        return json(
+          { ok: false, code: 500, message: `Failed to create deck: ${deckError.message}` },
+          { status: 500 }
+        );
       }
 
       targetDeckId = newDeck.id;
@@ -94,7 +111,10 @@ export const POST: RequestHandler = async (event) => {
     const parseResult = parseCsv(csvContent, targetDeckId);
 
     if (parseResult.words.length === 0) {
-      throw error(400, 'No valid words found in CSV');
+      return json(
+        { ok: false, code: 400, message: 'No valid words found in CSV' },
+        { status: 400 }
+      );
     }
 
     // Prepare words for bulk insert
@@ -119,7 +139,10 @@ export const POST: RequestHandler = async (event) => {
     const { error: wordsError } = await supabase.from('words').insert(wordsToInsert);
 
     if (wordsError) {
-      throw error(500, `Failed to insert words: ${wordsError.message}`);
+      return json(
+        { ok: false, code: 500, message: `Failed to insert words: ${wordsError.message}` },
+        { status: 500 }
+      );
     }
 
     // Bulk insert scheduling
@@ -138,7 +161,10 @@ export const POST: RequestHandler = async (event) => {
     const { error: schedulingError } = await supabase.from('scheduling').insert(schedulingToInsert);
 
     if (schedulingError) {
-      throw error(500, `Failed to insert scheduling: ${schedulingError.message}`);
+      return json(
+        { ok: false, code: 500, message: `Failed to insert scheduling: ${schedulingError.message}` },
+        { status: 500 }
+      );
     }
 
     // Log the ingest
@@ -157,9 +183,9 @@ export const POST: RequestHandler = async (event) => {
       // Don't fail the request if logging fails
     }
 
-    // Return success
+    // Return success - always JSON
     return json({
-      success: true,
+      ok: true,
       deckId: targetDeckId,
       inserted: parseResult.valid,
       skipped: parseResult.invalid,
@@ -169,9 +195,10 @@ export const POST: RequestHandler = async (event) => {
     });
   } catch (err: any) {
     console.error('Import error:', err);
-    if (err.status) {
-      throw err;
-    }
-    throw error(500, err.message || 'Import failed');
+    const message = err instanceof Error ? err.message : String(err);
+    return json(
+      { ok: false, code: 500, message: `Import failed: ${message}` },
+      { status: 500 }
+    );
   }
 };
