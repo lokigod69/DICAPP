@@ -285,7 +285,7 @@
         <h2 class="text-2xl font-bold mb-2">No Decks Yet</h2>
         <p class="mb-6" style="color: var(--muted)">Create your first deck to get started</p>
         <button
-          on:click={createNewDeck}
+          on:click={openNewDeckDialog}
           class="px-6 py-3 rounded font-semibold"
           style="background: var(--accent-1); color: var(--bg)"
         >
