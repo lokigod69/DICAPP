@@ -65,6 +65,10 @@
   function goToDecks() {
     goto('/decks');
   }
+
+  function goToExplore() {
+    goto('/explore');
+  }
 </script>
 
 <Header />
@@ -141,6 +145,14 @@
             style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--fg)"
           >
             Import CSV
+          </button>
+
+          <button
+            on:click={goToExplore}
+            class="py-3 px-4 rounded-lg font-medium transition-all hover:scale-[1.02]"
+            style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--fg)"
+          >
+            Explore Decks
           </button>
 
           {#if stats.leeches > 0}

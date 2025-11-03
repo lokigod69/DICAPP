@@ -1,25 +1,21 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { getDataStore } from '$lib/stores/database';
   import { deckStore } from '$lib/stores/deck';
-  import { parseCsv, previewCsv, type CsvError } from '@runedeck/core/csv';
-  import { createDeck } from '@runedeck/core/models';
+  import { previewCsv } from '@runedeck/core/csv';
+  import { supabase } from '$lib/supabase';
   import { ArrowLeft, Upload, CheckCircle, AlertCircle } from 'lucide-svelte';
 
   let fileInput: HTMLInputElement;
+  let selectedFile: File | null = null;
   let csvContent = '';
   let preview: any[] = [];
   let totalRows = 0;
-  let errors: CsvError[] = [];
   let importing = false;
   let imported = false;
-  let validCount = 0;
-  let invalidCount = 0;
+  let importResult: any = null;
   let selectedDeckId = '';
   let loading = true;
-  let detectedProfile: 'simple' | 'full' | null = null;
-  let warnings: string[] = [];
   let fileName = '';
   let createNewDeck = false;
   let newDeckName = '';
@@ -37,6 +33,7 @@
     if (!file) return;
 
     try {
+      selectedFile = file;
       csvContent = await file.text();
       fileName = file.name.replace(/\.csv$/i, ''); // Remove .csv extension
       newDeckName = fileName; // Default new deck name to file name
@@ -44,7 +41,6 @@
       const { preview: previewData, total } = previewCsv(csvContent, 20);
       preview = previewData;
       totalRows = total;
-      errors = [];
       imported = false;
     } catch (err: any) {
       alert('Failed to read file: ' + err.message);
@@ -52,7 +48,7 @@
   }
 
   async function importCsv() {
-    if (!csvContent) {
+    if (!selectedFile) {
       alert('No CSV loaded');
       return;
     }
@@ -62,50 +58,63 @@
       return;
     }
 
+    if (createNewDeck && !newDeckName.trim()) {
+      alert('Please enter a deck name');
+      return;
+    }
+
     importing = true;
 
     try {
-      const dataStore = await getDataStore();
-      let targetDeckId = selectedDeckId;
+      // Get auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('Not authenticated. Please sign in.');
+        goto('/auth/signin');
+        return;
+      }
 
-      // Create new deck if requested
+      // Prepare form data
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('createDeck', createNewDeck.toString());
+
       if (createNewDeck) {
-        if (!newDeckName.trim()) {
-          alert('Please enter a deck name');
-          importing = false;
-          return;
-        }
-
-        const newDeck = createDeck({
-          name: newDeckName.trim(),
-          profile: detectedProfile || 'full',
-        });
-
-        await dataStore.createDeck(newDeck);
-        targetDeckId = newDeck.id;
-
-        // Reload decks and set as current
-        await deckStore.load();
-        await deckStore.setCurrent(targetDeckId);
+        formData.append('newDeckName', newDeckName.trim());
+      } else {
+        formData.append('deckId', selectedDeckId);
       }
 
-      // Parse with profile detection and deck assignment
-      const result = parseCsv(csvContent, targetDeckId);
-      validCount = result.valid;
-      invalidCount = result.invalid;
-      errors = result.errors;
-      detectedProfile = result.profile;
-      warnings = result.warnings;
+      // Call server endpoint
+      const response = await fetch('/api/import', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${session.access_token}`,
+        },
+        body: formData,
+      });
 
-      if (result.words.length > 0) {
-        await dataStore.batchImportWords(result.words);
-        imported = true;
+      const result = await response.json();
 
-        // Redirect home after success
-        setTimeout(() => {
-          goto('/');
-        }, 2000);
+      if (!response.ok) {
+        throw new Error(result.message || 'Import failed');
       }
+
+      importResult = result;
+      imported = true;
+
+      // Reload decks
+      await deckStore.refresh();
+
+      // Set current deck to imported deck
+      if (result.deckId) {
+        await deckStore.setCurrent(result.deckId);
+      }
+
+      // Redirect home after success
+      setTimeout(() => {
+        goto('/');
+      }, 2000);
     } catch (err: any) {
       alert('Import failed: ' + err.message);
     } finally {
@@ -117,10 +126,9 @@
     csvContent = '';
     preview = [];
     totalRows = 0;
-    errors = [];
     imported = false;
-    validCount = 0;
-    invalidCount = 0;
+    importResult = null;
+    selectedFile = null;
     if (fileInput) fileInput.value = '';
   }
 
@@ -206,15 +214,27 @@
       </div>
     {/if}
 
-    {#if imported}
+    {#if imported && importResult}
       <!-- Success message -->
       <div class="bg-green-900/20 border border-green-500/50 rounded-lg p-8 text-center">
         <CheckCircle size={48} class="mx-auto mb-4 text-green-400" />
         <h2 class="text-2xl font-bold mb-2 text-green-400">Import Successful!</h2>
         <p class="text-lg mb-4" style="color: var(--muted)">
-          Imported {validCount} {validCount === 1 ? 'word' : 'words'}
+          Imported {importResult.inserted} {importResult.inserted === 1 ? 'word' : 'words'}
         </p>
-        <p class="text-sm" style="color: var(--muted)">Redirecting to home...</p>
+        {#if importResult.skipped > 0}
+          <p class="text-sm mb-2" style="color: var(--muted)">
+            Skipped {importResult.skipped} invalid {importResult.skipped === 1 ? 'row' : 'rows'}
+          </p>
+        {/if}
+        {#if importResult.profile}
+          <p class="text-sm mb-2">
+            <span class="px-2 py-1 rounded text-xs font-semibold" style="background: {importResult.profile === 'simple' ? 'var(--accent-2)' : 'var(--accent-1)'}; color: var(--bg)">
+              {importResult.profile.toUpperCase()} PROFILE
+            </span>
+          </p>
+        {/if}
+        <p class="text-sm mt-4" style="color: var(--muted)">Redirecting to home...</p>
       </div>
     {:else if !csvContent}
       <!-- File upload -->
@@ -268,32 +288,6 @@ susurrus,n.,/suˈsʌr.əs/,a soft murmuring,A susurrus rose,Flüstern,&lt;Latin&
     {:else}
       <!-- Preview -->
       <div class="space-y-6">
-        <!-- Profile Badge and Warnings -->
-        {#if detectedProfile}
-          <div class="p-4 rounded-lg" style="background: var(--card-bg); border: 1px solid var(--card-border)">
-            <div class="flex items-center gap-3 mb-2">
-              <span class="px-3 py-1 rounded text-xs font-semibold" style="background: {detectedProfile === 'simple' ? 'var(--accent-2)' : 'var(--accent-1)'}; color: var(--bg)">
-                {detectedProfile.toUpperCase()} PROFILE
-              </span>
-              {#if detectedProfile === 'simple'}
-                <span class="text-sm" style="color: var(--muted)">Headword + Translation (minimal fields)</span>
-              {:else}
-                <span class="text-sm" style="color: var(--muted)">Full schema with all fields</span>
-              {/if}
-            </div>
-            {#if warnings.length > 0}
-              <div class="mt-2 space-y-1">
-                {#each warnings as warning}
-                  <div class="text-sm flex items-start gap-2" style="color: var(--muted)">
-                    <AlertCircle size={16} class="mt-0.5 flex-shrink-0" />
-                    <span>{warning}</span>
-                  </div>
-                {/each}
-              </div>
-            {/if}
-          </div>
-        {/if}
-
         <!-- Stats -->
         <div class="flex gap-4">
           <div class="flex-1 p-4 rounded-lg" style="background: var(--card-bg); border: 1px solid var(--card-border)">
@@ -329,28 +323,6 @@ susurrus,n.,/suˈsʌr.əs/,a soft murmuring,A susurrus rose,Flüstern,&lt;Latin&
             </tbody>
           </table>
         </div>
-
-        <!-- Errors (if any after import attempt) -->
-        {#if errors.length > 0}
-          <div class="bg-red-900/20 border border-red-500/50 rounded-lg p-4">
-            <div class="flex items-center gap-2 mb-2">
-              <AlertCircle size={20} class="text-red-400" />
-              <h3 class="font-semibold text-red-400">Validation Errors ({errors.length})</h3>
-            </div>
-            <div class="space-y-2 text-sm">
-              {#each errors.slice(0, 10) as error}
-                <div style="color: var(--muted)">
-                  Row {error.row}{error.field ? ` (${error.field})` : ''}: {error.message}
-                </div>
-              {/each}
-              {#if errors.length > 10}
-                <div style="color: var(--muted); opacity: 0.7">
-                  ... and {errors.length - 10} more errors
-                </div>
-              {/if}
-            </div>
-          </div>
-        {/if}
 
         <!-- Actions -->
         <div class="flex gap-4">
