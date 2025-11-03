@@ -1,6 +1,7 @@
 export * from './IDataStore';
 export * from './SqliteStore';
 export * from './WasmSqliteStore';
+export * from './CloudStore';
 export * from './schema';
 
 /**
