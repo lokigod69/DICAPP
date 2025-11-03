@@ -1,29 +1,19 @@
 import { json, error } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+import { getSupabase } from '@supabase/auth-helpers-sveltekit';
 import type { RequestHandler } from './$types';
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async (event) => {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
+    // Get Supabase client from cookies (includes user session)
+    const { supabaseClient: supabase, session } = await getSupabase(event);
+
+    if (!session) {
       throw error(401, 'Unauthorized');
     }
 
-    const supabase = createClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
-      global: { headers: { authorization: authHeader } },
-    });
+    const user = session.user;
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw error(401, 'Unauthorized');
-    }
-
-    const { fromDeckId, toDeckId } = await request.json();
+    const { fromDeckId, toDeckId } = await event.request.json();
 
     if (!fromDeckId || !toDeckId) {
       throw error(400, 'Missing deck IDs');

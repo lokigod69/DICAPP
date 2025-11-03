@@ -173,6 +173,9 @@
               <div class="p-3 border-b" style="border-color: var(--card-border)">
                 <div class="text-sm font-semibold truncate">{$authStore.user.user_metadata?.full_name || 'User'}</div>
                 <div class="text-xs truncate" style="color: var(--muted)">{$authStore.user.email}</div>
+                {#if $authStore.user.app_metadata?.provider}
+                  <div class="text-xs mt-1 capitalize" style="color: var(--muted)">via {$authStore.user.app_metadata.provider}</div>
+                {/if}
               </div>
               <div class="p-2">
                 <button

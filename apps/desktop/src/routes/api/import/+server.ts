@@ -1,39 +1,22 @@
 import { json, error } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+import { getSupabase } from '@supabase/auth-helpers-sveltekit';
 import { parseCsv } from '@runedeck/core/csv';
 import { createWord, createInitialScheduling } from '@runedeck/core/models';
 import type { RequestHandler } from './$types';
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async (event) => {
   try {
-    // Get auth header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
+    // Get Supabase client from cookies (includes user session)
+    const { supabaseClient: supabase, session } = await getSupabase(event);
+
+    if (!session) {
       throw error(401, 'Unauthorized');
     }
 
-    // Create Supabase client with user's auth token
-    const supabase = createClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
-      global: {
-        headers: {
-          authorization: authHeader,
-        },
-      },
-    });
-
-    // Verify user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      throw error(401, 'Unauthorized');
-    }
+    const user = session.user;
 
     // Parse form data
-    const formData = await request.formData();
+    const formData = await event.request.formData();
     const file = formData.get('file') as File;
     const deckId = formData.get('deckId') as string;
     const createDeck = formData.get('createDeck') === 'true';

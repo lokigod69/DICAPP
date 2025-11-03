@@ -165,9 +165,9 @@
 
       const response = await fetch('/api/merge/preview', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           fromDeckId: mergeFromDeckId,
@@ -206,9 +206,9 @@
 
       const response = await fetch('/api/merge/commit', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           fromDeckId: mergeFromDeckId,

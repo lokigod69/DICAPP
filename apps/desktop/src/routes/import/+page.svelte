@@ -66,7 +66,7 @@
     importing = true;
 
     try {
-      // Get auth token
+      // Check auth
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         alert('Not authenticated. Please sign in.');
@@ -85,12 +85,10 @@
         formData.append('deckId', selectedDeckId);
       }
 
-      // Call server endpoint
+      // Call server endpoint (cookies will contain session)
       const response = await fetch('/api/import', {
         method: 'POST',
-        headers: {
-          authorization: `Bearer ${session.access_token}`,
-        },
+        credentials: 'include',
         body: formData,
       });
 
