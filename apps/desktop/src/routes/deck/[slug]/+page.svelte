@@ -131,8 +131,13 @@
 
       if (schedError) throw new Error(`Failed to create scheduling: ${schedError.message}`);
 
-      // Success! Redirect to decks page
-      alert(`Successfully cloned "${deck.name}"! You now have your own copy.`);
+      // Success! Set as current deck and redirect
+      const { deckStore } = await import('$lib/stores/deck');
+      await deckStore.refresh();
+      await deckStore.setCurrent(newDeckId);
+
+      const wordCount = clonedWords.length;
+      alert(`Cloned "${deck.name}" • ${wordCount} ${wordCount === 1 ? 'word' : 'words'}`);
       goto('/decks');
     } catch (err: any) {
       alert(`Clone failed: ${err.message}`);

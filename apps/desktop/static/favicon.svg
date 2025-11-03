@@ -1,0 +1,16 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#BFA76A"></stop>
+      <stop offset="1" stop-color="#D9C890"></stop>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0E0E10"></rect>
+  <!-- Book -->
+  <path d="M16 20c0-2 1.6-4 4-4h10c2.4 0 4 2 4 4v24c0 2.2-1.8 4-4 4H20c-2.4 0-4-1.8-4-4V20z" fill="#1A1A1E" stroke="url(#g)" stroke-width="1.5"></path>
+  <path d="M34 20c0-2 1.6-4 4-4h10c2.4 0 4 2 4 4v24c0 2.2-1.8 4-4 4H38c-2.4 0-4-1.8-4-4V20z" fill="#101014" stroke="url(#g)" stroke-width="1.5"></path>
+  <!-- Center ribbon -->
+  <rect x="31" y="16" width="2" height="30" fill="url(#g)" opacity="0.85"></rect>
+  <!-- Rune diamond -->
+  <path d="M32 26l5 5-5 5-5-5 5-5z" fill="none" stroke="url(#g)" stroke-width="1.5"></path>
+</svg>

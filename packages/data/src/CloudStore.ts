@@ -380,6 +380,8 @@ export class CloudStore implements IDataStore {
       return data.map((row) => row.id);
     }
     if (scope.type === 'current') {
+      // Guard against null/empty currentDeckId
+      if (!currentDeckId) return [];
       return [currentDeckId];
     }
     return scope.deckIds;

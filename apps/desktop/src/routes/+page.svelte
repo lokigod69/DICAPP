@@ -4,7 +4,9 @@
   import { getDataStore } from '$lib/stores/database';
   import { deckStore } from '$lib/stores/deck';
   import { scopeStore } from '$lib/stores/scope';
+  import { authStore } from '$lib/stores/auth';
   import Header from '$lib/components/Header.svelte';
+  import { Plus, FileUp, Compass, LogIn } from 'lucide-svelte';
 
   let stats = {
     total: 0,
@@ -15,13 +17,11 @@
     leeches: 0,
   };
   let loading = true;
-  let error = '';
 
   async function loadStats() {
     try {
       const currentDeckId = $deckStore.currentDeckId;
       if (!currentDeckId) {
-        error = 'No deck selected. Please create a deck first.';
         loading = false;
         return;
       }
@@ -30,23 +30,33 @@
       stats = await dataStore.getStatsByScope($scopeStore, currentDeckId);
       loading = false;
     } catch (err: any) {
-      error = err.message;
+      console.error('Failed to load stats:', err);
       loading = false;
     }
   }
 
   onMount(async () => {
-    // Load decks and select current/default
-    await deckStore.load();
-    await loadStats();
+    await authStore.init();
+
+    // Only load decks/stats if authenticated
+    if ($authStore.user) {
+      await deckStore.load();
+      await loadStats();
+    } else {
+      loading = false;
+    }
   });
 
   // Reload stats when scope changes
-  $: if ($scopeStore && $deckStore.currentDeckId) {
+  $: if ($authStore.user && $scopeStore && $deckStore.currentDeckId) {
     loadStats();
   }
 
   function startReview() {
+    if (!$deckStore.currentDeckId) {
+      alert('Create a deck first to start studying.');
+      return;
+    }
     goto('/study');
   }
 
@@ -55,6 +65,10 @@
   }
 
   function goToClinic() {
+    if (!$deckStore.currentDeckId) {
+      alert('Create a deck first.');
+      return;
+    }
     goto('/clinic');
   }
 
@@ -68,6 +82,10 @@
 
   function goToExplore() {
     goto('/explore');
+  }
+
+  function goToSignIn() {
+    goto('/auth/signin');
   }
 </script>
 
@@ -83,7 +101,7 @@
       <p class="text-xl" style="color: var(--muted)">
         Advanced vocabulary training with spaced repetition
       </p>
-      {#if $scopeStore.type === 'all'}
+      {#if $authStore.user && $scopeStore.type === 'all'}
         <p class="text-sm mt-2" style="color: var(--accent-2)">
           Studying across all {$deckStore.decks.length} decks
         </p>
@@ -93,11 +111,71 @@
     {#if loading}
       <div class="text-center py-12">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style="border-color: var(--accent-1)"></div>
-        <p class="mt-4" style="color: var(--muted)">Loading deck...</p>
+        <p class="mt-4" style="color: var(--muted)">Loading...</p>
       </div>
-    {:else if error}
-      <div class="bg-red-900/20 border border-red-500/50 rounded-lg p-6 mb-8">
-        <p class="text-red-400">Error: {error}</p>
+    {:else if !$authStore.user}
+      <!-- Signed Out State -->
+      <div class="space-y-6">
+        <div class="text-center py-8 px-6 rounded-lg" style="background: var(--card-bg); border: 1px solid var(--card-border)">
+          <p class="text-lg mb-6" style="color: var(--muted)">
+            Sign in to create decks and start learning
+          </p>
+          <button
+            on:click={goToSignIn}
+            class="px-6 py-3 rounded-lg font-semibold transition-all hover:scale-105 inline-flex items-center gap-2"
+            style="background: var(--accent-1); color: var(--bg)"
+          >
+            <LogIn size={20} />
+            Sign In with Google
+          </button>
+        </div>
+
+        <div class="text-center">
+          <p class="mb-4" style="color: var(--muted)">Or browse public decks</p>
+          <button
+            on:click={goToExplore}
+            class="px-6 py-3 rounded-lg font-medium transition-all hover:scale-105 inline-flex items-center gap-2"
+            style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--fg)"
+          >
+            <Compass size={20} />
+            Explore Public Decks
+          </button>
+        </div>
+      </div>
+    {:else if $deckStore.decks.length === 0}
+      <!-- Empty State (No Decks) -->
+      <div class="space-y-6">
+        <div class="text-center py-8 px-6 rounded-lg" style="background: var(--card-bg); border: 1px solid var(--card-border)">
+          <p class="text-lg mb-6" style="color: var(--muted)">
+            Get started by creating your first deck
+          </p>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button
+              on:click={goToDecks}
+              class="py-4 px-6 rounded-lg font-medium transition-all hover:scale-105 flex flex-col items-center gap-2"
+              style="background: var(--accent-1); color: var(--bg)"
+            >
+              <Plus size={24} />
+              <span>Create Deck</span>
+            </button>
+            <button
+              on:click={goToImport}
+              class="py-4 px-6 rounded-lg font-medium transition-all hover:scale-105 flex flex-col items-center gap-2"
+              style="background: var(--accent-2); color: var(--bg)"
+            >
+              <FileUp size={24} />
+              <span>Import CSV</span>
+            </button>
+            <button
+              on:click={goToExplore}
+              class="py-4 px-6 rounded-lg font-medium transition-all hover:scale-105 flex flex-col items-center gap-2"
+              style="background: var(--card-bg); border: 1px solid var(--card-border); color: var(--fg)"
+            >
+              <Compass size={24} />
+              <span>Explore & Clone</span>
+            </button>
+          </div>
+        </div>
       </div>
     {:else}
       <!-- Stats -->
