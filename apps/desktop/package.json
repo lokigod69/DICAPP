@@ -15,6 +15,7 @@
     "@runedeck/data": "workspace:*",
     "@runedeck/ui": "workspace:*",
     "@supabase/auth-helpers-sveltekit": "^0.13.0",
+    "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.78.0",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-sql": "^2.0.0"

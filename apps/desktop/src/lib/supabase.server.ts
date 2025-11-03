@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/auth-helpers-sveltekit';
+import { createServerClient } from '@supabase/ssr';
 import type { RequestEvent } from '@sveltejs/kit';
 import { env } from '$env/dynamic/public';
 
@@ -13,9 +13,12 @@ export function supaFromEvent(event: RequestEvent) {
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
-      get: (key) => event.cookies.get(key),
-      set: (key, value, options) => event.cookies.set(key, value, options),
-      remove: (key, options) => event.cookies.delete(key, options),
+      getAll: () => event.cookies.getAll(),
+      setAll: (cookiesToSet) => {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          event.cookies.set(name, value, { ...options, path: '/' });
+        });
+      },
     },
   });
 }
