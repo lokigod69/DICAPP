@@ -31,6 +31,10 @@ export const POST: RequestHandler = async (event) => {
       throw error(400, 'No deck specified');
     }
 
+    if (createDeck && !newDeckName?.trim()) {
+      throw error(400, 'Deck name required');
+    }
+
     // Read CSV content
     const csvContent = await file.text();
     const timestamp = Date.now();

@@ -6,6 +6,7 @@
   import { scopeStore } from '$lib/stores/scope';
   import { authStore } from '$lib/stores/auth';
   import Header from '$lib/components/Header.svelte';
+  import NewDeckDialog from '$lib/components/NewDeckDialog.svelte';
   import { Plus, FileUp, Compass, LogIn } from 'lucide-svelte';
 
   let stats = {
@@ -17,6 +18,7 @@
     leeches: 0,
   };
   let loading = true;
+  let showNewDeckDialog = false;
 
   async function loadStats() {
     try {
@@ -77,7 +79,11 @@
   }
 
   function goToDecks() {
-    goto('/decks');
+    showNewDeckDialog = true;
+  }
+
+  function closeNewDeckDialog() {
+    showNewDeckDialog = false;
   }
 
   function goToExplore() {
@@ -262,3 +268,5 @@
     {/if}
   </div>
 </div>
+
+<NewDeckDialog open={showNewDeckDialog} onClose={closeNewDeckDialog} />

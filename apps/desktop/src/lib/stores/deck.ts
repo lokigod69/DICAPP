@@ -74,6 +74,22 @@ function createDeckStore() {
     },
 
     /**
+     * Set current deck (alias for selectDeck for API consistency)
+     */
+    setCurrent(deckId: string | null) {
+      if (deckId === null) {
+        update(s => {
+          if (browser) {
+            localStorage.removeItem(STORAGE_KEY);
+          }
+          return { ...s, currentDeckId: null };
+        });
+      } else {
+        this.selectDeck(deckId);
+      }
+    },
+
+    /**
      * Reload decks list (after create/delete)
      */
     async refresh() {

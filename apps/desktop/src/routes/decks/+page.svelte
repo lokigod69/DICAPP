@@ -5,6 +5,7 @@
   import { getDataStore } from '$lib/stores/database';
   import { supabase } from '$lib/supabase';
   import { Plus, BookOpen, Upload, Download, ArrowLeft, Eye, EyeOff } from 'lucide-svelte';
+  import NewDeckDialog from '$lib/components/NewDeckDialog.svelte';
   import type { Deck } from '@runedeck/core/models';
 
   interface DeckWithStats extends Deck {
@@ -30,10 +31,6 @@
   let previewing = false;
 
   let showNewDeckDialog = false;
-  let newDeckName = '';
-  let newDeckProfile: 'simple' | 'full' = 'full';
-  let newDeckVisibility: 'private' | 'public' = 'private';
-  let creating = false;
 
   onMount(async () => {
     await loadDecks();
@@ -77,50 +74,11 @@
 
   function openNewDeckDialog() {
     showNewDeckDialog = true;
-    newDeckName = '';
-    newDeckProfile = 'full';
-    newDeckVisibility = 'private';
   }
 
   function closeNewDeckDialog() {
     showNewDeckDialog = false;
-  }
-
-  async function createNewDeck() {
-    if (!newDeckName.trim()) {
-      alert('Please enter a deck name');
-      return;
-    }
-
-    creating = true;
-
-    try {
-      const { createDeck } = await import('@runedeck/core/models');
-      const deck = createDeck({
-        name: newDeckName.trim(),
-        profile: newDeckProfile,
-      });
-
-      // Override visibility if public
-      if (newDeckVisibility === 'public') {
-        (deck as any).visibility = 'public';
-      }
-
-      const dataStore = await getDataStore();
-      await dataStore.createDeck(deck);
-      await deckStore.refresh();
-      await deckStore.setCurrent(deck.id);
-      await loadDecks();
-
-      closeNewDeckDialog();
-
-      // Redirect to import page with the new deck selected
-      goto('/import');
-    } catch (err: any) {
-      alert('Failed to create deck: ' + err.message);
-    } finally {
-      creating = false;
-    }
+    loadDecks(); // Refresh after dialog closes
   }
 
   async function deleteDeck(deck: DeckWithStats) {
@@ -583,79 +541,5 @@
   {/if}
 
   <!-- New Deck Dialog -->
-  {#if showNewDeckDialog}
-    <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" on:click={closeNewDeckDialog}>
-      <div class="rounded-lg p-6 max-w-md w-full" style="background: var(--card-bg); border: 1px solid var(--card-border)" on:click={(e) => e.stopPropagation()}>
-        <h2 class="text-2xl font-bold mb-6" style="color: var(--accent-1)">Create New Deck</h2>
-
-        <div class="space-y-4 mb-6">
-          <div>
-            <label class="block mb-2 font-semibold">Deck Name</label>
-            <input
-              type="text"
-              bind:value={newDeckName}
-              placeholder="e.g., Spanish Vocabulary"
-              class="w-full px-4 py-2 rounded border"
-              style="background: var(--bg); border-color: var(--card-border); color: var(--fg)"
-              disabled={creating}
-              on:keydown={(e) => e.key === 'Enter' && createNewDeck()}
-            />
-          </div>
-
-          <div>
-            <label class="block mb-2 font-semibold">Profile</label>
-            <div class="space-y-2">
-              <label class="flex items-start gap-2 cursor-pointer">
-                <input type="radio" bind:group={newDeckProfile} value="simple" disabled={creating} />
-                <div>
-                  <div class="font-medium">Simple</div>
-                  <div class="text-xs" style="color: var(--muted)">Headword + Translation (minimal fields)</div>
-                </div>
-              </label>
-              <label class="flex items-start gap-2 cursor-pointer">
-                <input type="radio" bind:group={newDeckProfile} value="full" disabled={creating} />
-                <div>
-                  <div class="font-medium">Full</div>
-                  <div class="text-xs" style="color: var(--muted)">All fields (IPA, etymology, mnemonic, etc.)</div>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          <div>
-            <label class="block mb-2 font-semibold">Visibility</label>
-            <div class="space-y-2">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" bind:group={newDeckVisibility} value="private" disabled={creating} />
-                <span>Private (only you)</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="radio" bind:group={newDeckVisibility} value="public" disabled={creating} />
-                <span>Public (anyone can view/clone)</span>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex gap-3">
-          <button
-            on:click={closeNewDeckDialog}
-            class="flex-1 py-2 px-4 rounded font-semibold transition-all hover:scale-105"
-            style="background: var(--bg); border: 1px solid var(--card-border); color: var(--fg)"
-            disabled={creating}
-          >
-            Cancel
-          </button>
-          <button
-            on:click={createNewDeck}
-            class="flex-1 py-2 px-4 rounded font-semibold transition-all hover:scale-105 disabled:opacity-50"
-            style="background: var(--accent-1); color: var(--bg)"
-            disabled={creating || !newDeckName.trim()}
-          >
-            {creating ? 'Creating...' : 'Create & Import'}
-          </button>
-        </div>
-      </div>
-    </div>
-  {/if}
+  <NewDeckDialog open={showNewDeckDialog} onClose={closeNewDeckDialog} />
 </div>

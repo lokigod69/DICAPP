@@ -19,6 +19,7 @@
   let fileName = '';
   let createNewDeck = false;
   let newDeckName = '';
+  let error = '';
 
   onMount(async () => {
     await deckStore.load();
@@ -33,6 +34,7 @@
     if (!file) return;
 
     try {
+      error = '';
       selectedFile = file;
       csvContent = await file.text();
       fileName = file.name.replace(/\.csv$/i, ''); // Remove .csv extension
@@ -43,23 +45,27 @@
       totalRows = total;
       imported = false;
     } catch (err: any) {
-      alert('Failed to read file: ' + err.message);
+      error = 'Failed to read file: ' + err.message;
     }
   }
 
   async function importCsv() {
+    // Clear previous errors
+    error = '';
+
+    // Validation
     if (!selectedFile) {
-      alert('No CSV loaded');
+      error = 'Please choose a CSV file';
       return;
     }
 
     if (!createNewDeck && !selectedDeckId) {
-      alert('Please select a deck or choose to create a new one');
+      error = 'Please select a deck or choose to create a new one';
       return;
     }
 
     if (createNewDeck && !newDeckName.trim()) {
-      alert('Please enter a deck name');
+      error = 'Please enter a deck name';
       return;
     }
 
@@ -69,7 +75,7 @@
       // Check auth
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        alert('Not authenticated. Please sign in.');
+        error = 'Not authenticated. Please sign in.';
         goto('/auth/signin');
         return;
       }
@@ -106,7 +112,7 @@
 
       // Set current deck to imported deck
       if (result.deckId) {
-        await deckStore.setCurrent(result.deckId);
+        deckStore.setCurrent(result.deckId);
       }
 
       // Redirect home after success
@@ -114,7 +120,7 @@
         goto('/');
       }, 2000);
     } catch (err: any) {
-      alert('Import failed: ' + err.message);
+      error = 'Import failed: ' + err.message;
     } finally {
       importing = false;
     }
@@ -133,6 +139,9 @@
   function goHome() {
     goto('/');
   }
+
+  // Computed: Can submit form
+  $: canSubmit = !importing && selectedFile !== null && (createNewDeck ? newDeckName.trim().length > 0 : selectedDeckId.length > 0);
 </script>
 
 <div class="min-h-screen p-8">
@@ -155,15 +164,30 @@
       <div class="w-24"></div>
     </div>
 
+    <!-- Error Display -->
+    {#if error}
+      <div
+        class="mb-6 p-4 rounded-lg text-sm"
+        style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: rgb(239, 68, 68)"
+        role="alert"
+      >
+        <div class="flex items-start gap-2">
+          <AlertCircle size={20} class="flex-shrink-0 mt-0.5" />
+          <span>{error}</span>
+        </div>
+      </div>
+    {/if}
+
     <!-- Deck Selector -->
     {#if !loading && !imported}
       <div class="mb-6 p-4 rounded-lg" style="background: var(--card-bg); border: 1px solid var(--card-border)">
-        <label class="block mb-3 font-semibold">Target Deck:</label>
+        <label for="target-deck-mode" class="block mb-3 font-semibold">Target Deck:</label>
 
         <!-- Radio buttons for deck selection mode -->
-        <div class="flex gap-6 mb-4">
+        <div id="target-deck-mode" class="flex gap-6 mb-4" role="radiogroup">
           <label class="flex items-center gap-2 cursor-pointer">
             <input
+              id="import-existing"
               type="radio"
               bind:group={createNewDeck}
               value={false}
@@ -173,6 +197,7 @@
           </label>
           <label class="flex items-center gap-2 cursor-pointer">
             <input
+              id="import-new"
               type="radio"
               bind:group={createNewDeck}
               value={true}
@@ -185,8 +210,9 @@
         {#if createNewDeck}
           <!-- New deck name input -->
           <div>
-            <label class="block mb-2 text-sm" style="color: var(--muted)">New Deck Name:</label>
+            <label for="new-deck-name" class="block mb-2 text-sm" style="color: var(--muted)">New Deck Name:</label>
             <input
+              id="new-deck-name"
               type="text"
               bind:value={newDeckName}
               placeholder="Enter deck name..."
@@ -199,7 +225,9 @@
           </div>
         {:else}
           <!-- Existing deck selector -->
+          <label for="existing-deck-select" class="sr-only">Select existing deck</label>
           <select
+            id="existing-deck-select"
             bind:value={selectedDeckId}
             class="w-full px-4 py-2 rounded border"
             style="background: var(--bg); border-color: var(--card-border); color: var(--fg)"
@@ -334,9 +362,10 @@ susurrus,n.,/suˈsʌr.əs/,a soft murmuring,A susurrus rose,Flüstern,&lt;Latin&
           </button>
           <button
             on:click={importCsv}
-            class="flex-1 py-3 px-6 rounded-lg font-semibold transition-all hover:scale-105 disabled:opacity-50"
+            class="flex-1 py-3 px-6 rounded-lg font-semibold transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             style="background: var(--accent-1); color: var(--bg); box-shadow: var(--shadow-lg)"
-            disabled={importing}
+            disabled={!canSubmit}
+            title={!canSubmit && !importing ? 'Please select a file and deck' : ''}
           >
             {importing ? 'Importing...' : 'Import Words'}
           </button>
