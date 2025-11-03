@@ -1,5 +1,5 @@
 import { json, error } from '@sveltejs/kit';
-import { getSupabase } from '@supabase/auth-helpers-sveltekit';
+import { supaFromEvent } from '$lib/supabase.server';
 import type { RequestHandler } from './$types';
 
 type MergeStrategy = 'skip-duplicates' | 'merge-fields' | 'force-move';
@@ -7,7 +7,8 @@ type MergeStrategy = 'skip-duplicates' | 'merge-fields' | 'force-move';
 export const POST: RequestHandler = async (event) => {
   try {
     // Get Supabase client from cookies (includes user session)
-    const { supabaseClient: supabase, session } = await getSupabase(event);
+    const supabase = supaFromEvent(event);
+    const { data: { session } } = await supabase.auth.getSession();
 
     if (!session) {
       throw error(401, 'Unauthorized');
