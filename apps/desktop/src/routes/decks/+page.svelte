@@ -4,6 +4,7 @@
   import { deckStore } from '$lib/stores/deck';
   import { getDataStore } from '$lib/stores/database';
   import { supabase } from '$lib/supabaseClient';
+  import { fetchWithAuth } from '$lib/api/fetchWithAuth';
   import { Plus, BookOpen, Upload, Download, ArrowLeft, Eye, EyeOff } from 'lucide-svelte';
   import NewDeckDialog from '$lib/components/NewDeckDialog.svelte';
   import type { Deck } from '@runedeck/core/models';
@@ -149,15 +150,8 @@
     previewing = true;
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert('Not authenticated');
-        return;
-      }
-
-      const response = await fetch('/api/merge/preview', {
+      const response = await fetchWithAuth('/api/merge/preview', {
         method: 'POST',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -190,15 +184,8 @@
     merging = true;
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert('Not authenticated');
-        return;
-      }
-
-      const response = await fetch('/api/merge/commit', {
+      const response = await fetchWithAuth('/api/merge/commit', {
         method: 'POST',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
