@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { deckStore } from '$lib/stores/deck';
+  import { authStore } from '$lib/stores/auth';
   import { previewCsv } from '@runedeck/core/csv';
   import { fetchWithAuth } from '$lib/api/fetchWithAuth';
   import { ArrowLeft, Upload, CheckCircle, AlertCircle } from 'lucide-svelte';
@@ -20,10 +22,24 @@
   let createNewDeck = false;
   let newDeckName = '';
   let error = '';
+  let sessionExpired = false;
 
   onMount(async () => {
     await deckStore.load();
-    selectedDeckId = $deckStore.currentDeckId || '';
+
+    // Check for deck query parameter (from NewDeckDialog redirect)
+    const deckIdFromUrl = $page.url.searchParams.get('deck');
+    if (deckIdFromUrl) {
+      selectedDeckId = deckIdFromUrl;
+      // Also set as current deck if valid
+      const deckExists = $deckStore.decks.some(d => d.id === deckIdFromUrl);
+      if (deckExists) {
+        deckStore.setCurrent(deckIdFromUrl);
+      }
+    } else {
+      selectedDeckId = $deckStore.currentDeckId || '';
+    }
+
     loading = false;
   });
 
@@ -70,15 +86,9 @@
     }
 
     importing = true;
+    sessionExpired = false;
 
     try {
-      // Check auth
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        error = 'Not authenticated. Please sign in.';
-        goto('/auth/signin');
-        return;
-      }
 
       // Prepare form data
       const formData = new FormData();
@@ -106,7 +116,15 @@
         throw new Error(`Import failed (${response.status}): ${text.slice(0, 200)}`);
       }
 
-      // Check for errors
+      // Check for 401 - session expired
+      if (response.status === 401 || result.code === 401) {
+        sessionExpired = true;
+        error = 'Session expired. Please sign in again.';
+        importing = false;
+        return;
+      }
+
+      // Check for other errors
       if (!response.ok || !result.ok) {
         throw new Error(result?.message ?? `Import failed (${response.status})`);
       }
@@ -147,8 +165,21 @@
     goto('/');
   }
 
-  // Computed: Can submit form
-  $: canSubmit = !importing && selectedFile !== null && (createNewDeck ? newDeckName.trim().length > 0 : selectedDeckId.length > 0);
+  // Computed: Can submit form (auth + file + deck)
+  $: canSubmit = !importing &&
+                 $authStore.user !== null &&
+                 selectedFile !== null &&
+                 (createNewDeck ? newDeckName.trim().length > 0 : selectedDeckId.length > 0);
+
+  // Helper to get validation message
+  $: validationMessage = (() => {
+    if (importing) return '';
+    if (!$authStore.user) return 'Sign in to import words';
+    if (!selectedFile) return 'Choose a CSV file first';
+    if (!createNewDeck && !selectedDeckId) return 'Select a deck';
+    if (createNewDeck && !newDeckName.trim()) return 'Enter a deck name';
+    return '';
+  })();
 </script>
 
 <div class="min-h-screen p-8">
@@ -180,7 +211,36 @@
       >
         <div class="flex items-start gap-2">
           <AlertCircle size={20} class="flex-shrink-0 mt-0.5" />
-          <span>{error}</span>
+          <div class="flex-1">
+            <span>{error}</span>
+            {#if sessionExpired}
+              <div class="mt-3">
+                <a
+                  href="/auth/signin"
+                  class="inline-flex items-center gap-2 px-4 py-2 rounded font-semibold transition-all hover:scale-105"
+                  style="background: var(--accent-1); color: var(--bg)"
+                >
+                  Sign in again
+                </a>
+              </div>
+            {/if}
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    <!-- Auth Warning -->
+    {#if !$authStore.user && !imported}
+      <div
+        class="mb-6 p-4 rounded-lg text-sm"
+        style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: rgb(239, 68, 68)"
+        role="alert"
+      >
+        <div class="flex items-start gap-2">
+          <AlertCircle size={20} class="flex-shrink-0 mt-0.5" />
+          <div class="flex-1">
+            <span>Please <a href="/auth/signin" class="underline font-semibold">sign in</a> to import words.</span>
+          </div>
         </div>
       </div>
     {/if}
@@ -372,7 +432,7 @@ susurrus,n.,/suˈsʌr.əs/,a soft murmuring,A susurrus rose,Flüstern,&lt;Latin&
             class="flex-1 py-3 px-6 rounded-lg font-semibold transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
             style="background: var(--accent-1); color: var(--bg); box-shadow: var(--shadow-lg)"
             disabled={!canSubmit}
-            title={!canSubmit && !importing ? 'Please select a file and deck' : ''}
+            title={validationMessage}
           >
             {importing ? 'Importing...' : 'Import Words'}
           </button>
