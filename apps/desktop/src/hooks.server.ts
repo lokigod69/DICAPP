@@ -1,12 +1,12 @@
 import { createServerClient } from '@supabase/ssr';
 import type { Handle } from '@sveltejs/kit';
-import { env } from '$env/dynamic/public';
+import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 
 export const handle: Handle = async ({ event, resolve }) => {
   // Create Supabase server client with cookie handling and Authorization header forwarding
   const supabase = createServerClient(
-    env.PUBLIC_SUPABASE_URL!,
-    env.PUBLIC_SUPABASE_ANON_KEY!,
+    PUBLIC_SUPABASE_URL,
+    PUBLIC_SUPABASE_ANON_KEY,
     {
       cookies: {
         get: (key) => event.cookies.get(key),

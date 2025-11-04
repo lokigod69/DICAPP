@@ -3,7 +3,7 @@
   import { goto } from '$app/navigation';
   import { deckStore } from '$lib/stores/deck';
   import { getDataStore } from '$lib/stores/database';
-  import { supabase } from '$lib/supabase';
+  import { supabase } from '$lib/supabaseClient';
   import { Plus, BookOpen, Upload, Download, ArrowLeft, Eye, EyeOff } from 'lucide-svelte';
   import NewDeckDialog from '$lib/components/NewDeckDialog.svelte';
   import type { Deck } from '@runedeck/core/models';

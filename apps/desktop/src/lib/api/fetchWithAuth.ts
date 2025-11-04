@@ -1,4 +1,4 @@
-import { supabase } from '$lib/supabase';
+import { supabase } from '$lib/supabaseClient';
 
 /**
  * Fetch wrapper that automatically includes the Supabase access token

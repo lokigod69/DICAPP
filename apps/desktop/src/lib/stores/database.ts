@@ -1,5 +1,5 @@
 import { CloudStore, type IDataStore } from '@runedeck/data';
-import { supabase } from '$lib/supabase';
+import { supabase } from '$lib/supabaseClient';
 
 /**
  * Global data store instance (initialized in browser only)

@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { supabase } from '$lib/supabase';
+  import { supabase } from '$lib/supabaseClient';
   import { authStore } from '$lib/stores/auth';
   import { createDeck, uuid } from '@runedeck/core/models';
   import Header from '$lib/components/Header.svelte';

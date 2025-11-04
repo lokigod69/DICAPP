@@ -1,5 +1,5 @@
 import { writable } from 'svelte/store';
-import { supabase } from '$lib/supabase';
+import { supabase } from '$lib/supabaseClient';
 import type { User } from '@supabase/supabase-js';
 
 interface AuthState {
