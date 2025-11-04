@@ -1,33 +1,43 @@
-import { json, error } from '@sveltejs/kit';
-import { supaFromEvent } from '$lib/supabase.server';
+import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 type MergeStrategy = 'skip-duplicates' | 'merge-fields' | 'force-move';
 
-export const POST: RequestHandler = async (event) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
   try {
-    // Get Supabase client from cookies (includes user session)
-    const supabase = supaFromEvent(event);
-    const { data: { session } } = await supabase.auth.getSession();
-
+    // Get session from locals (validates auth)
+    const session = await locals.getSession();
     if (!session) {
-      throw error(401, 'Unauthorized');
+      return json(
+        { ok: false, code: 401, message: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
     const user = session.user;
+    const supabase = locals.supabase;
 
-    const { fromDeckId, toDeckId, strategy } = await event.request.json();
+    const { fromDeckId, toDeckId, strategy } = await request.json();
 
     if (!fromDeckId || !toDeckId || !strategy) {
-      throw error(400, 'Missing required parameters');
+      return json(
+        { ok: false, code: 400, message: 'Missing required parameters' },
+        { status: 400 }
+      );
     }
 
     if (!['skip-duplicates', 'merge-fields', 'force-move'].includes(strategy)) {
-      throw error(400, 'Invalid merge strategy');
+      return json(
+        { ok: false, code: 400, message: 'Invalid merge strategy' },
+        { status: 400 }
+      );
     }
 
     if (fromDeckId === toDeckId) {
-      throw error(400, 'Cannot merge deck into itself');
+      return json(
+        { ok: false, code: 400, message: 'Cannot merge deck into itself' },
+        { status: 400 }
+      );
     }
 
     // Verify ownership
@@ -38,7 +48,10 @@ export const POST: RequestHandler = async (event) => {
       .eq('user_id', user.id);
 
     if (deckError || !decks || decks.length !== 2) {
-      throw error(403, 'Decks not found or not owned by user');
+      return json(
+        { ok: false, code: 403, message: 'Decks not found or not owned by user' },
+        { status: 403 }
+      );
     }
 
     // Get all words from source deck
@@ -49,7 +62,10 @@ export const POST: RequestHandler = async (event) => {
       .is('deleted_at', null);
 
     if (fromError) {
-      throw error(500, `Failed to fetch source words: ${fromError.message}`);
+      return json(
+        { ok: false, code: 500, message: `Failed to fetch source words: ${fromError.message}` },
+        { status: 500 }
+      );
     }
 
     // Get all words from target deck
@@ -60,7 +76,10 @@ export const POST: RequestHandler = async (event) => {
       .is('deleted_at', null);
 
     if (toError) {
-      throw error(500, `Failed to fetch target words: ${toError.message}`);
+      return json(
+        { ok: false, code: 500, message: `Failed to fetch target words: ${toError.message}` },
+        { status: 500 }
+      );
     }
 
     // Build duplicate key map
@@ -159,7 +178,10 @@ export const POST: RequestHandler = async (event) => {
     });
   } catch (err: any) {
     console.error('Merge commit error:', err);
-    if (err.status) throw err;
-    throw error(500, err.message || 'Merge failed');
+    const message = err instanceof Error ? err.message : String(err);
+    return json(
+      { ok: false, code: 500, message: `Merge failed: ${message}` },
+      { status: 500 }
+    );
   }
 };

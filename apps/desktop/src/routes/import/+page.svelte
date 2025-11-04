@@ -3,7 +3,7 @@
   import { goto } from '$app/navigation';
   import { deckStore } from '$lib/stores/deck';
   import { previewCsv } from '@runedeck/core/csv';
-  import { supabase } from '$lib/supabase';
+  import { fetchWithAuth } from '$lib/api/fetchWithAuth';
   import { ArrowLeft, Upload, CheckCircle, AlertCircle } from 'lucide-svelte';
 
   let fileInput: HTMLInputElement;
@@ -91,10 +91,9 @@
         formData.append('deckId', selectedDeckId);
       }
 
-      // Call server endpoint (cookies will contain session)
-      const response = await fetch('/api/import', {
+      // Call server endpoint with auth token
+      const response = await fetchWithAuth('/api/import', {
         method: 'POST',
-        credentials: 'include',
         body: formData,
       });
 

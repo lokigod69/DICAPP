@@ -5,17 +5,17 @@ import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
   try {
-    // Get Supabase client from locals (set in hooks)
-    const supabase = locals.supabase;
-
-    // Validate auth - always return JSON
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    // Get session from locals (validates auth)
+    const session = await locals.getSession();
+    if (!session) {
       return json(
         { ok: false, code: 401, message: 'Unauthorized - please sign in' },
         { status: 401 }
       );
     }
+
+    const user = session.user;
+    const supabase = locals.supabase;
 
     // Parse form data
     const formData = await request.formData();
