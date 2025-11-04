@@ -83,6 +83,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       const { data: newDeck, error: deckError } = await supabase
         .from('decks')
         .insert({
+          user_id: user.id,
           name: newDeckName.trim(),
           slug,
           profile,
@@ -120,6 +121,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     // Prepare words for bulk insert
     const wordsToInsert = parseResult.words.map((word) => ({
       id: word.id,
+      user_id: user.id,
       deck_id: word.deck_id,
       headword: word.headword,
       pos: word.pos,
@@ -169,6 +171,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
     // Log the ingest
     const { error: ingestError } = await supabase.from('ingests').insert({
+      user_id: user.id,
       deck_id: targetDeckId,
       filename,
       storage_path: storagePath,
