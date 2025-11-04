@@ -29,10 +29,22 @@ function createAuthStore() {
     });
   }
 
-  // Sign out
+  // Sign out with full cleanup
   async function signOut() {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Sign out error:', err);
+    }
+
+    // Clear local state
     set({ user: null, loading: false });
+
+    // Belt + suspenders: nuke cookies manually
+    if (typeof document !== 'undefined') {
+      document.cookie = 'sb-access-token=; Max-Age=0; path=/';
+      document.cookie = 'sb-refresh-token=; Max-Age=0; path=/';
+    }
   }
 
   return {

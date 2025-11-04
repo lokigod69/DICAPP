@@ -162,6 +162,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
     // Log the merge
     const { error: logError } = await supabase.from('merge_logs').insert({
+      user_id: user.id,
       from_deck_id: fromDeckId,
       to_deck_id: toDeckId,
       strategy,

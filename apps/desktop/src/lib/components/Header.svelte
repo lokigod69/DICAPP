@@ -42,7 +42,8 @@
   async function handleSignOut() {
     await authStore.signOut();
     showAccountMenu = false;
-    goto('/');
+    // Hard navigation to force SSR + CSR to agree
+    goto('/?signedout=1', { replaceState: true, invalidateAll: true });
   }
 
   function goToAccount() {

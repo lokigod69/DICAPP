@@ -1,0 +1,9 @@
+{
+  "redirects": [
+    {
+      "source": "https://www.dicapp.xyz/(.*)",
+      "destination": "https://dicapp.xyz/$1",
+      "permanent": true
+    }
+  ]
+}
