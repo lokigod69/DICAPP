@@ -49,3 +49,5 @@ apps/web/.svelte-kit
 dist
 pnpm-lock.yaml
 .DS_Store
+
+.vercel
