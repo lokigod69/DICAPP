@@ -62,11 +62,11 @@ export const POST: RequestHandler = async ({ request }) => {
     const timestamp = Date.now();
     const filename = file.name;
 
-    // Upload to storage
+    // Upload to storage (bucket name: 'ingests')
     const storagePath = `${user.id}/ingests/${timestamp}-${filename}`;
-    const { error: uploadError } = await supabase.storage.from('uploads').upload(storagePath, file, {
+    const { error: uploadError } = await supabase.storage.from('ingests').upload(storagePath, file, {
       contentType: 'text/csv',
-      upsert: false,
+      upsert: true,
     });
 
     if (uploadError) {
