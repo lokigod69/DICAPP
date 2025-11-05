@@ -1,19 +1,30 @@
 import { json } from '@sveltejs/kit';
+import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+import { createClient } from '@supabase/supabase-js';
 import type { RequestHandler } from './$types';
 
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request }) => {
   try {
-    // Get session from locals (validates auth)
-    const session = await locals.getSession();
-    if (!session) {
+    // Authenticate via Authorization header
+    const auth = request.headers.get('authorization');
+    if (!auth) {
       return json(
         { ok: false, code: 401, message: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    const user = session.user;
-    const supabase = locals.supabase;
+    const supabase = createClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: auth } }
+    });
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return json(
+        { ok: false, code: 401, message: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
 
     const { fromDeckId, toDeckId } = await request.json();
 
