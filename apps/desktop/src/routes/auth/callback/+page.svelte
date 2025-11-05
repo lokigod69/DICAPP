@@ -1,13 +1,33 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { supabase } from '$lib/supabase';
+  import { page } from '$app/stores';
+  import { supabase } from '$lib/supabaseClient';
 
   let status = 'processing';
   let error = '';
 
   onMount(async () => {
-    // Handle the OAuth callback
+    // Exchange code for session (OAuth callback)
+    const code = $page.url.searchParams.get('code');
+
+    if (code) {
+      const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+      if (exchangeError) {
+        error = exchangeError.message;
+        status = 'error';
+        return;
+      }
+
+      if (!data.session) {
+        error = 'Failed to create session';
+        status = 'error';
+        return;
+      }
+    }
+
+    // Get the current session
     const { data, error: authError } = await supabase.auth.getSession();
 
     if (authError) {
@@ -33,10 +53,10 @@
         });
       }
 
-      // Success - redirect to decks page
+      // Success - redirect to home with hard reload to ensure session propagates
       status = 'success';
       setTimeout(() => {
-        goto('/decks');
+        window.location.href = '/';
       }, 1000);
     } else {
       error = 'No session found';
