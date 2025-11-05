@@ -3,6 +3,7 @@ import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/publi
 import { createClient } from '@supabase/supabase-js';
 import { parseCsv } from '@runedeck/core/csv';
 import { createInitialScheduling } from '@runedeck/core/models';
+import { UPLOAD_BUCKET } from '$lib/config';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request }) => {
@@ -62,12 +63,23 @@ export const POST: RequestHandler = async ({ request }) => {
     const timestamp = Date.now();
     const filename = file.name;
 
-    // Upload to storage (bucket name: 'ingests')
+    // Sanity check: verify bucket exists
+    const { data: bucketInfo } = await supabase.storage.getBucket(UPLOAD_BUCKET);
+    if (!bucketInfo) {
+      return json(
+        { ok: false, code: 400, message: `Bucket not found: ${UPLOAD_BUCKET} (project=${PUBLIC_SUPABASE_URL})` },
+        { status: 400 }
+      );
+    }
+
+    // Upload to storage
     const storagePath = `${user.id}/ingests/${timestamp}-${filename}`;
-    const { error: uploadError } = await supabase.storage.from('ingests').upload(storagePath, file, {
-      contentType: 'text/csv',
-      upsert: true,
-    });
+    const { error: uploadError } = await supabase.storage
+      .from(UPLOAD_BUCKET)
+      .upload(storagePath, file, {
+        contentType: 'text/csv',
+        upsert: true,
+      });
 
     if (uploadError) {
       return json(
