@@ -4,7 +4,20 @@
       "Bash(git push)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(pnpm add:*)"
+      "Bash(pnpm add:*)",
+      "Bash(git push:*)",
+      "Bash(magick convert:*)",
+      "Bash(convert:*)",
+      "Bash(pnpm build:*)",
+      "Bash(mkdir:*)",
+      "Bash(find:*)",
+      "Bash(for file in \"apps/desktop/src/routes/explore/+page.svelte\" \"apps/desktop/src/routes/account/+page.svelte\" \"apps/desktop/src/routes/auth/callback/+page.svelte\" \"apps/desktop/src/routes/auth/signin/+page.svelte\")",
+      "Bash(do)",
+      "Bash(if [ -f \"$file\" ])",
+      "Bash(then)",
+      "Bash(echo:*)",
+      "Bash(fi)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []
