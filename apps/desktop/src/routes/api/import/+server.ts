@@ -141,23 +141,16 @@ export const POST: RequestHandler = async ({ request }) => {
       );
     }
 
-    // Prepare words for bulk insert
+    // Prepare words for bulk insert (only columns that exist in DB schema)
     const wordsToInsert = parseResult.words.map((word) => ({
       id: word.id,
       user_id: user.id,
       deck_id: word.deck_id,
       headword: word.headword,
-      pos: word.pos,
-      ipa: word.ipa,
-      definition: word.definition,
-      example: word.example,
-      gloss_de: word.gloss_de,
-      etymology: word.etymology,
-      mnemonic: word.mnemonic,
-      tags: word.tags.join(';'),
-      freq: word.freq,
+      pos: word.pos || null,
+      definition: word.definition || null,
+      tags: word.tags && word.tags.length > 0 ? word.tags : [],
       created_at: new Date(word.created_at).toISOString(),
-      updated_at: new Date(word.updated_at).toISOString(),
     }));
 
     // Bulk insert words
